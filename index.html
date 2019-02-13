@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>Status Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="bootstrap.min.css" rel="stylesheet">
+    <link id="favicon" rel="shortcut icon" type="image/png" href="favicon.png" />
+    <style type="text/css" media="screen">
+        i.on { color: green; }
+        i.dk { color: white; }
+        i.off { color: red; }
+        i {
+            color: red;
+            display: inline-block;
+            padding-right: 10px;
+            font-style: normal;
+        }
+        #power, button {
+            margin-right: 10px;
+            margin-bottom: 5px !important;
+        }
+        html {
+            position: relative;
+            min-height: 100%;
+        }
+        body {
+            /* Margin bottom by footer height */
+            margin-bottom: 60px;
+        }
+        .footer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            /* Set the fixed height of the footer here */
+            height: 60px;
+            background-color: #f5f5f5;
+        }
+        .container .text-muted {
+            margin: 20px 0;
+        }
+        #screenshot img {
+            max-width: 320px; height: auto;
+        }
+        img.aqi {
+            width: 32px; height: 32px;
+        }
+        .tt .tooltiptext {
+            visibility: hidden;
+            width: 120px;
+            background-color: black;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            /* Position the tooltip */
+            position: absolute;
+            z-index: 1;
+            bottom: 100%;
+            left: 50%;
+            margin-left: -60px;
+        }
+
+        .tt:hover .tooltiptext {
+            visibility: visible;
+        }
+
+        .switches td span {
+            display: inline-block;
+        }
+
+        template {
+            display: hidden;
+        }
+    </style>
+    <script src="jquery.min.js"></script>
+    <script src="bootstrap.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="page-header">
+        <h1>状态</h1>
+    </div>
+    <p class="lead">
+        AQI：<img id="aqi" class="aqi" /> <img id="city_aqi" class="aqi" /> &emsp;
+        室温：<span id="air_temp"></span>&emsp;湿度：<span id="air_hum"></span> &emsp;
+        AQI 预报：<img id="aqi_pred" class="aqi" /><br />
+        <!-- 931 路：<span id="bus_status"></span> -->
+        台式机：<span id="self_nodes_computer_power"><span class="hidden when-on"><i class="on">● 在线</i>
+                <button type="button" class="btn btn-sm btn-danger" data-action="force_off">强制关机</button>
+        </span><span class="hidden when-off"><i class="off">● 离线</i>
+                <button type="button" class="btn btn-sm btn-success" data-action="computer/uflash">开机</button>
+    </span></span>
+    </p>
+    <div class="row">
+        <div class="col-sm-7">
+            <table class="table table-condensed">
+                <thead>
+                <tr>
+                    <th colspan="2">树莓派</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>温度
+                        <span id="self_temp"></span>
+						<button type="button" class="btn btn-sm btn-primary" data-action="reboot">重启</button>
+					</td></tr>
+                <tr>
+                    <td>负载
+                        <span id="self_uptime"></span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <table class="table table-condensed">
+                <thead>
+                <tr>
+                    <th colspan="2">路由器</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>温度
+                        <span id="router_temp"></span>
+                        <button type="button" class="btn btn-sm btn-primary" data-action="node/router/reboot">重启</button>
+					</td>
+				</tr>
+                <tr>
+                    <td>负载
+                        <span id="router_uptime"></span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <table class="table table-condensed">
+                <thead>
+                <tr>
+                    <th colspan="2">SONY</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>温度
+                        <span id="sony_temp"></span>
+                        <span id="self_nodes_sony_power">
+                            <span class="when-off">
+                                <button type="button" class="btn btn-sm btn-success" data-action="node/sony/power_on">开机</button>
+                            </span>
+                            <span class="when-on">
+                                <button type="button" class="btn btn-sm btn-primary" data-action="node/sony/reboot">重启</button>
+                                <button type="button" class="btn btn-sm btn-danger" data-action="node/sony/power_off">关机</button>
+                                <button type="button" class="btn btn-sm btn-danger" data-action="node/sony/force_off">强制关机</button>
+                            </span>
+                        </span>
+					</td></tr>
+                <tr>
+                    <td>负载
+                        <span id="sony_uptime"></span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <table class="switches table table-condensed">
+                <thead>
+                <tr>
+                    <th colspan="4">其它设备</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td style="width: 100px;">灯</td>
+                    <td>
+                        <span id="self_nodes_lamp_power"><i class="on when-on hidden">● 开</i>
+                                <i class="off when-off hidden">● 关</i></span>
+                        <button type="button" class="btn btn-sm btn-success" data-action="node/lamp/power_on">开</button>
+                        <button type="button" class="btn btn-sm btn-danger" data-action="node/lamp/power_off">关</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width: 100px;">打印机</td>
+                    <td>
+                        <span id="self_nodes_printer_power"><i class="on when-on hidden">● 开</i>
+                                <i class="off when-off hidden">● 关</i></span>
+                        <button type="button" class="btn btn-sm btn-success" data-action="node/printer/power_on">开</button>
+                        <button type="button" class="btn btn-sm btn-danger" data-action="node/printer/power_off">关</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width: 100px;">空气净化器</td>
+                    <td>
+                        <span id="air"></span>
+                        <button type="button" class="btn btn-sm btn-primary" data-action="node/air/toggle">切换自动</button>
+                        <button type="button" class="btn btn-sm btn-success" data-action="node/air/speed1">速度1</button>
+                        <button type="button" class="btn btn-sm btn-success" data-action="node/air/speed2">速度2</button>
+                        <button type="button" class="btn btn-sm btn-success" data-action="node/air/speed3">速度3</button>
+                        <button type="button" class="btn btn-sm btn-danger" data-action="node/air/speed0">关</button>
+                        <button type="button" class="btn btn-sm btn-info" data-action="node/air/time">重置时间</button>
+                        <button type="button" class="btn btn-sm btn-info" data-action="node/air/reset">重置状态</button>
+                        <button type="button" class="btn btn-sm btn-info" data-action="node/air/bgon">打开背景灯</button>
+                        <button type="button" class="btn btn-sm btn-info" data-action="node/air/bgoff">关闭背景灯</button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="col-sm-5">
+            <table class="switches table table-condensed">
+                <thead>
+                <tr>
+                    <th colspan="4">网络服务</th>
+                </tr>
+                </thead>
+                <tbody>
+                <template id="services">
+                    <tr>
+                        <td style="width: 100px;">{name}</td>
+                        <td>
+                            <span id="{name_}"><i class="on when-on hidden">● 开</i>
+                                <i class="off when-off hidden">● 关</i></span>
+                            <button type="button" class="btn btn-sm btn-success" data-action="{service_}start">开</button>
+                            <button type="button" class="btn btn-sm btn-danger" data-action="{service_}stop">关</button>
+                            <button type="button" class="btn btn-sm btn-primary" data-action="{service_}restart">重启</button>
+                        </td>
+                    </tr>
+                </template>
+                <template id="action">
+                    <a type="button" class="btn btn-sm" href="{link}" target="_blank">{text}</a>
+                </template>
+                </tbody>
+            </table>
+            <table class="table-condensed">
+                <tbody>
+                <tr><td colspan="2"><img src="" id="ux_video" style="display: none; width: 100%;"></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<footer class="footer">
+    <div class="container">
+        <p class="text-muted">Home-Server Status Monitor</p>
+    </div>
+</footer>
+
+<script type="text/javascript">
+    String.prototype.format = function (o) {
+        return this.replace(/\{(.*?)\}/g, function(x) { return o[x.substr(1, x.length-2)]; });
+    };
+
+    const nodes = [{
+        name: 'self',
+        callback: (resp) => {
+            if (resp.services.mjpg_streamer) $('#ux_video').attr('src', 'stream').show();
+            else $('#ux_video').hide().attr('src', '');
+        }
+    }, {
+        name: 'air',
+        callback: (resp) => {
+            $('#aqi')
+                .attr('src', resp.aqi_icon)
+                .attr('title', 'PM2.5: ' + resp.pm25_at + ', PM10: ' + resp.pm10_at);
+            $("#favicon").attr("href", resp.aqi_icon);
+        }
+    }, {
+        name: 'computer'
+    }, {
+        name: 'sony'
+    }, {
+        name: 'router'
+    }];
+
+    function render_object(o, name) {
+        if (o && o.temp) o.temp = o.temp.replace(/d/g, '°C');
+        name = name || '';
+
+        switch (typeof(o)) {
+            case "object":
+                for (var k in o)
+                    render_object(o[k], (name ? (name + '_') : '') + k);
+                break;
+            case "boolean":
+                console.log(name, o);
+                $('#' + name + ' ' + (o ? '.when-on' : '.when-off')).removeClass('hidden').siblings().addClass('hidden');
+                break;
+            default:
+                console.log(name, o);
+				$('#' + name).html(o);
+				break;
+        }
+    }
+
+    function getStatus() {
+        let unreachable = {};
+        for (let node of nodes) {
+            if (unreachable[node.name]) continue;
+            $.get('node/' + node.name, (data) => {
+                data.resp = data.resp || {};
+                render_object(data.resp, data.node);
+                if (node.callback) node.callback(data.resp);
+                for (var child of data.nodes || []) {
+                    if (!child.power) unreachable[child.name] = true;
+                }
+            });
+        }
+    }
+
+    $(document).on('click', 'button', function () {
+        const action = $(this).data('action');
+        if (action === 'force_off') if (!confirm('可能造成数据丢失，确定？')) return;
+        $(this).attr('disabled', 'disabled');
+        $.get('./' + action, function (data) {
+            if (action === 'ping') alert(data === '1' ? 'online' : 'offline');
+            $('button[disabled]').removeAttr('disabled');
+            getStatus();
+        }).fail(function (st, resp) {
+			$('button[disabled]').removeAttr('disabled');
+            alert(resp); // or whatever
+		});
+    });
+
+    $.get('node/self/load_services', function (data) {
+        data = data.resp;
+        const tmpl_el = $('template#services');
+        const tmpl = tmpl_el.html();
+        const tmpl_action = $('template#action').html();
+        const disp = tmpl_el.parent();
+        for (let serv of data) {
+            if (serv.uname && serv.uname.substr(0, 2) === '//') continue;
+            var nodename = 'self', servname = serv.name;
+            if (serv.name.indexOf('@') > 0) {
+                const a = serv.name.split('@');
+                nodename = a[1];
+                servname = a[0];
+            }
+            serv.name_ = nodename + '_services_' + servname;
+            serv.service_ = 'node/' + nodename + '/set_service/' + servname + ',';
+            disp.append(tmpl.format(serv));
+            if (serv.actions) {
+                for (let j in serv.actions)
+					if (-1 == ['start', 'stop', 'restart'].indexOf(j))
+						disp.children().last().children('td').last()
+							.append(tmpl_action.format({'text': j, 'link': serv.actions[j]}));
+            }
+        }
+        getStatus();
+    });
+
+    setInterval(getStatus, 20000);
+
+    (function(w,d,t,f){  w[f]=w[f]||function(c,k,n){s=w[f],k=s['k']=(s['k']||(k?('&k='+k):''));s['c']=
+        c=(c  instanceof  Array)?c:[c];s['n']=n=n||0;L=d.createElement(t),e=d.getElementsByTagName(t)[0];
+        L.async=1;L.src='//feed.aqicn.org/feed/'+(c[n].city)+'/'+(c[n].lang||'')+'/feed.v1.js?n='+n+k;
+        e.parentNode.insertBefore(L,e);  };  })(  window,document,'script','_aqiFeed'  );
+    _aqiFeed({
+        city:"Shanghai/luwanshizhuanfuxiao",
+        callback:function(aqi){
+            $('#city_aqi').attr('src', 'aqi_icon/' + aqi.aqit.match(/>(\d+)<\/span>/)[1]);
+        }
+    });
+    $.get('aqi_pred', function (data) {
+        const s = 30;
+        $('#aqi_pred').attr('src', 'aqi_icon/' + parseInt(data.tomorrow*s) + ':' + parseInt(data.the_day_after_tomorrow*s));
+    });
+</script>
+</body>
+</html>
