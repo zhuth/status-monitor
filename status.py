@@ -401,7 +401,7 @@ def index(p='index.html'):
 
 if __name__ == '__main__':
 
-    if os.path.exists('bootstrap.min.css'):
+    if not os.path.exists('bootstrap.min.css'):
         os.system('wget -n https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js')
         os.system('wget -n https://stackpath.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js')
         os.system('wget -n https://stackpath.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css')
