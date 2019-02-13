@@ -8,7 +8,7 @@ from io import BytesIO
 colors = [(int(_[:2], 16), int(_[2:4], 16), int(_[4:], 16)) for _ in ('1e3cff', '00a0ff', '00dc00', 'a0e632', 'e6dc32', 'f08228', 'fa3c3c', 'f00082')]
 
 cities = {
-    'Shanghai': (250, 250, 265, 265)
+    'default': (250, 250, 265, 265)
 }
 
 def fetch_pictures(count):
@@ -33,7 +33,6 @@ def _fetch_picture(hr):
             print(fn)
             with open('/tmp/' + fn, 'wb') as fo:
                 fo.write(requests.get('https://sprintars.riam.kyushu-u.ac.jp/images/' + fn, timeout=10,
-# proxies={'https': 'http://localhost:1080'}
                 ).content)
         
         try:
@@ -82,7 +81,7 @@ def _value_average(im, rect, by='count'):
     }[by](data)
     
     
-def predict(hrs, city='Shanghai', span=24, avg='average'):
+def predict(hrs, city='default', span=24, avg='average'):
     '''
     predict `span` hours after now + `hrs`
     avg: return max or average level in this `span` hours
