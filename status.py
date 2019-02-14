@@ -301,27 +301,26 @@ class SelfNode(StatusNode):
         return True
 
     def load_services(self):
-        if self.services == 'auto':
-            services = json.loads(open('services.json', encoding='utf-8').read())
-            services = [_ for _ in services if not _.get('uname', '').startswith('//')]
+        services = json.loads(open('services.json', encoding='utf-8').read())
+        services = [_ for _ in services if not _.get('uname', '').startswith('//')]
 
-            for node_name, n in self.nodes.items():
-                if n.services:
-                    services += [
-                        {
-                            'name': '{}@{}'.format(_['name'], node_name),
-                            'uname': '',
-                            'actions': _.get('actions', [])
-                        }
-                        for _ in n.load_services()
-                        if not _.get('uname', '').startswith('//')
-                    ]
+        for node_name, n in self.nodes.items():
+            if n.services:
+                services += [
+                    {
+                        'name': '{}@{}'.format(_['name'], node_name),
+                        'uname': '',
+                        'actions': _.get('actions', [])
+                    }
+                    for _ in n.load_services()
+                    if not _.get('uname', '').startswith('//')
+                ]
 
-            self.serv_procs = dict([(_['proc'] + ':' + _.get('uname', ''), _)
-                                    for _ in services if '@' not in _['name']])
+        self.serv_procs = dict([(_['proc'] + ':' + _.get('uname', ''), _)
+                                for _ in services if '@' not in _['name']])
 
-            self.services = services
-            self.serv_dict = dict([(_['name'], _) for _ in services])
+        self.services = services
+        self.serv_dict = dict([(_['name'], _) for _ in services])
             
         return self.services
 
