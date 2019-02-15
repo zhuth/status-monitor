@@ -5,6 +5,7 @@
 from flask import Flask, Response, jsonify, request
 import os, psutil, json, time, base64, sys, re
 import requests
+import subprocess
 
 app = Flask(__name__)
 
@@ -180,10 +181,21 @@ class AirPurifier(StatusNode):
 
 
 class SelfNode(StatusNode):
+    """
+    Detect system mode
+    """
     def __init__(self):
         StatusNode.__init__(self, ip='localhost', services='auto')
         self.serv_procs = {}
         self.nodes = {}
+        if subprocess.call('which systemctl'.split()) == 0:
+            self._service_cmd = 'systemctl {cmd} {name}'
+        #elif subprocess.call('which service'.split()) == 0:
+        #    self._service_cmd = 'service {name} {cmd}'
+        elif os.path.exists('/etc/init.d'):
+            self._service_cmd = '/etc/init.d/{name} {cmd}'
+        elif os.path.exists('/opt/etc/init.d'):
+            self._service_cmd = '/opt/etc/init.d/{name} {cmd}'
 
         if os.path.exists('nodes.json'):
             j = json.loads(open('nodes.json').read())
@@ -231,8 +243,7 @@ class SelfNode(StatusNode):
                 except:
                     pass
             return ''
-    
-        import subprocess
+
         status = {}
         status['nodes'] = {}
         for name, n in self.nodes.items():
@@ -292,7 +303,7 @@ class SelfNode(StatusNode):
                 else:
                     os.system(action)
             else:
-                os.system('systemctl {} {}'.format(cmd, service_name))
+                os.system(self._service_cmd.format(cmd=cmd, name=service_name))
     
         assert service_name in self.serv_dict
         actions = self.serv_dict[service_name].get('actions', {})
@@ -310,7 +321,8 @@ class SelfNode(StatusNode):
                     {
                         'name': '{}@{}'.format(_['name'], node_name),
                         'uname': '',
-                        'actions': _.get('actions', [])
+                        'actions': _.get('actions', []),
+                        'dispname': _.get('dispname', None),
                     }
                     for _ in n.load_services()
                     if not _.get('uname', '').startswith('//')
