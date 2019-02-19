@@ -133,12 +133,14 @@ class AirPurifier(StatusNode):
             r['aqi'] = '-'
             r['error'] = str(e)
 
-        if cmd == '?' and r['aqi'] != '-':
-            aqi_icon = self.icon(str(int(r['aqi'])))
-            r['aqi_icon'] = 'data:image/png;base64,' + base64.b64encode(aqi_icon).decode('ascii')
-            r['temp'] = str(int(r['temp'])) + 'd'
-            r['hum'] = str(int(r['hum'])) + '%'
-
+        if cmd == '?':
+            if r['aqi'] != '-':
+                aqi_icon = self.icon(str(int(r['aqi'])))
+                r['aqi_icon'] = 'data:image/png;base64,' + base64.b64encode(aqi_icon).decode('ascii')
+                r['temp'] = str(int(r['temp'])) + 'd'
+                r['hum'] = str(int(r['hum'])) + '%'
+        else:
+            r = r.decode('utf-8')
         return r
 
     def load_services(self):
