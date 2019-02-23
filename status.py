@@ -3,7 +3,7 @@
 # master version
 
 from flask import Flask, Response, jsonify, request
-import os, psutil, json, time, base64, sys, re
+import os, psutil, json, time, base64, sys, re, yaml
 import requests
 import subprocess
 
@@ -12,182 +12,14 @@ app = Flask(__name__)
 path = os.path.dirname(__file__) or './'
 os.chdir(path)
 
-class StatusNode:
-    """
-    Defines a status node
-    """
-    def __init__(self, ip=None, power_ip=None, services=None):
-        self.ip = ip
-        self.power_ip = power_ip
-        self.services = services
+import nodes
 
-    @staticmethod
-    def __curl(url, timeout=0.5):
-        try:
-            return requests.get(url, timeout=timeout)
-        except requests.exceptions.ReadTimeout:
-            raise TimeoutError
-        except requests.exceptions.ConnectionError:
-            raise TimeoutError
-
-    def detect_power(self):
-        if self.ip:
-            return self.ping()
-        else:  # with self.power_ip
-            try:
-                return StatusNode.__curl('http://{}/'.format(self.power_ip)).content == b'ON'
-            except TimeoutError:
-                pass
-
-    def ping(self):
-        if self.ip:
-            return os.system('/usr/bin/timeout 1s /bin/ping -c 1 {} > /dev/null'.format(self.ip)) == 0
-
-    def load_services(self):
-        if self.services == 'auto' and self.ip:
-            try:
-                self.services = json.loads(StatusNode.__curl('http://{}:10000/node/self/load_services'
-                                                             .format(self.ip))
-                                           .content.decode('utf-8'))['resp']
-            except TimeoutError:
-                pass
-            except KeyError:
-                pass
-        return self.services if isinstance(self.services, list) else []
-
-    def get_status(self):
-        if self.services and self.ip:
-            try:
-                return json.loads(StatusNode.__curl('http://{}:10000/node/self/get_status'.format(self.ip))
-                                  .content.decode('utf-8'))['resp']
-            except TimeoutError:
-                return
-
-    def power(self, cmd):
-        if self.power_ip:
-            assert cmd in ['on', 'off', 'uflash', 'flash']
-            assert StatusNode.__curl('http://{}/{}'.format(self.power_ip, cmd)).status_code == 200
-        return True
-
-    def force_off(self):
-        if self.power_ip:
-            self.power('on')
-            time.sleep(10)
-            self.power('off')
-            return True
-
-    def power_on(self):
-        if self.ip and self.power_ip: # computer
-            return self.power('uflash')
-        else:
-            return self.power('on')
-
-    def power_off(self):
-        if self.ip and self.services:
-            assert StatusNode.__curl('http://{}:10000/node/self/{}'.format(self.ip, 'power_off')).status_code == 200
-        elif self.ip and self.power_ip: # computer
-            return self.power('uflash')
-        else:
-            return self.power('off')
-            
-    def reboot(self):
-        assert StatusNode.__curl('http://{}:10000/node/self/{}'.format(self.ip, 'reboot')).status_code == 200
-        return True
-
-    def set_service(self, service_name, cmd):
-        if self.ip and self.services:
-            assert cmd in ['restart', 'reload', 'stop', 'start', 'status']
-            assert StatusNode.__curl('http://{}:10000/node/self/set_service/{},{}'.
-                                     format(self.ip, service_name, cmd)).status_code == 200
-            return True
-
-
-class AirPurifier(StatusNode):
-
-    def __init__(self, socket='/tmp/aqimonitor.socket'):
-        StatusNode.__init__(self)
-        import aqimonitor
-        self.socket = socket
-        self.aqi_colors = aqimonitor.aqi_colors
-        self.icon = aqimonitor.icon
-
-    def call_command(self, cmd):
-        import socket
-        r = {}
-        try:
-            skt = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            skt.connect(self.socket)
-            skt.sendall(cmd.encode('utf-8'))
-            if cmd == '?':
-                tr = skt.recv(1024)
-                r = json.loads(tr[tr.find(b'{'):tr.rfind(b'}')+1].decode('utf-8'))
-                if r['aqi'] > 1000: raise Exception("Data range error.")
-            else:
-                r = b''
-                while True:
-                    tr = skt.recv(1024)
-                    if not tr: break
-                    r += tr
-            skt.close()
-        except TypeError as e:
-            r['aqi'] = '-'
-            r['error'] = str(e)
-
-        if cmd == '?':
-            if r['aqi'] != '-':
-                aqi_icon = self.icon(str(int(r['aqi'])))
-                r['aqi_icon'] = 'data:image/png;base64,' + base64.b64encode(aqi_icon).decode('ascii')
-                r['temp'] = str(int(r['temp'])) + 'd'
-                r['hum'] = str(int(r['hum'])) + '%'
-        else:
-            r = r.decode('utf-8')
-        return r
-
-    def load_services(self):
-        return []
-
-    def get_status(self):
-        return self.call_command('?')
-
-    def show(self, text):
-        return self.call_command('c' + text)
-
-    def reset(self):
-        return self.call_command('y')
-
-    def time(self):
-        import datetime
-        now = datetime.datetime.now()
-        return self.call_command('t{}{:02d}{:02d}'.format(now.year, now.month, now.day))
-
-    def toggle(self):
-        return self.call_command('-')
-
-    def speed0(self):
-        return self.call_command('0')
-
-    def speed1(self):
-        return self.call_command('1')
-
-    def speed2(self):
-        return self.call_command('2')
-
-    def speed3(self):
-        return self.call_command('x')
-
-    def bgon(self):
-        return self.call_command(':')
-
-    def bgoff(self):
-        return self.call_command('/')
-
-
-class SelfNode(StatusNode):
+class SelfNode(nodes.StatusNode):
     """
     Detect system mode
     """
     def __init__(self):
-        StatusNode.__init__(self, ip='localhost', services='auto')
+        nodes.StatusNode.__init__(self, ip='localhost', services='auto')
         self.serv_procs = {}
         self.nodes = {}
         if subprocess.call('which systemctl'.split()) == 0:
@@ -199,18 +31,12 @@ class SelfNode(StatusNode):
         elif os.path.exists('/opt/etc/init.d'):
             self._service_cmd = '/opt/etc/init.d/{name} {cmd}'
 
-        if os.path.exists('nodes.json'):
-            j = json.loads(open('nodes.json').read())
-            for n in j:
+        if os.path.exists('config.yaml'):
+            self.config = yaml.load(open('config.yaml'))
+            for n in self.config.get('nodes', []):
                 name = n['name']
-                if 'type' not in n:
-                    n['type'] = 'StatusNode'
-
-                cls = StatusNode
-                if n['type'] == 'AirPurifier':
-                    cls = AirPurifier
-
-                del n['type']
+                cls = nodes.__dict__.get(n.get('type'), nodes.StatusNode)
+                if 'type' in n: del n['type']
                 del n['name']
                 n = cls(**n)
                 self.nodes[name] = n
@@ -314,7 +140,7 @@ class SelfNode(StatusNode):
         return True
 
     def load_services(self):
-        services = json.loads(open('services.json', encoding='utf-8').read())
+        services = self.config.get('services', [])
         services = [_ for _ in services if not _.get('uname', '').startswith('//')]
 
         for node_name, n in self.nodes.items():
@@ -339,14 +165,6 @@ class SelfNode(StatusNode):
         return self.services
 
 
-selfnode = SelfNode()
-
-
-@app.route('/echo/<path:text>')
-def echo(text):
-    return text
-
-
 @app.route('/node/<node_name>/<cmd>/<arg>')
 @app.route('/node/<node_name>/<cmd>')
 @app.route('/node/<node_name>')
@@ -358,30 +176,6 @@ def node(node_name='self', cmd='get_status', arg=''):
         return jsonify({'node': node_name, 'resp': getattr(n, cmd)()})
     else:
         return 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n))), 404
-
-
-buses = None
-
-
-@app.route('/bus/<bus_no>/<int:stop>')
-def bus(bus_no, stop):
-    global buses
-    if buses is None:
-        if os.path.exists('bus.json'):
-            buses = json.loads(open('bus.json').read())
-        else:
-            return jsonify({'error': 404})
-
-    stop_type = 0 if stop > 0 else 1
-    stop = abs(stop)
-    bus_no = buses.get(bus_no + ('路' if bus_no.isnumeric() else ''), '')
-    if bus_no and stop:
-        bus_no = bus_no['sid']
-        cont = requests.post('http://shanghaicity.openservice.kankanews.com/public/bus/Getstop',
-                             {'stoptype': stop_type, 'stopid': '{}.'.format(stop), 'sid': bus_no}).content
-        return jsonify(json.loads(cont))
-    else:
-        return jsonify({'error': 999})
 
 
 @app.route('/aqi_icon/<aqi>')
@@ -424,4 +218,5 @@ if __name__ == '__main__':
             os.system('nohup python3 status.py > /dev/null')
             time.sleep(1)
     else:
+        selfnode = SelfNode()
         app.run(host='0.0.0.0', port=10000, debug=True)

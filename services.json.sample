@@ -1,4 +1,0 @@
-[
-    {"uname": "//something", "proc": "aria2c", "name": "aria2", "actions": {"UI": "link:/ui/"}},
-    {"uname": "streamer", "proc": "mjpg_streamer", "name": "mjpg_streamer"}
-]
