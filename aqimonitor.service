@@ -1,0 +1,18 @@
+[Unit]
+Description=AQI Monitor
+Documentation=https://github.com/zhuth/status-monitor
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+Restart=on-abnormal
+User=root
+Group=root
+WorkingDirectory=/home/pi/status
+ExecStart=/usr/bin/python3 /home/pi/status/aqimonitor.py auto
+ExecReload=/bin/kill -USR1 $MAINPID
+KillMode=mixed
+KillSignal=SIGQUIT
+
+[Install]
+WantedBy=multi-user.target
