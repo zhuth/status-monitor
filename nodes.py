@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import requests, subprocess, json
+import requests, subprocess, json, os, base64, time
 
 class StatusNode:
     """
@@ -13,7 +13,7 @@ class StatusNode:
         self.services = services
 
     @staticmethod
-    def __curl(url, timeout=0.5):
+    def __curl(url, timeout=2):
         try:
             return requests.get(url, timeout=timeout)
         except requests.exceptions.ReadTimeout:
