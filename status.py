@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# master version
 
 from flask import Flask, Response, jsonify, request
 import os, psutil, json, time, base64, sys, re, yaml
@@ -60,17 +59,14 @@ class SelfNode(nodes.StatusNode):
             return ''
     
         def temperature():
-            if os.path.exists('/sys/class/thermal/thermal_zone0/temp'):
+            if 'temperature_method' in self.config:
+                return eval(self.config['temperature_method'])
+            elif os.path.exists('/sys/class/thermal/thermal_zone0/temp'):
                 with open('/sys/class/thermal/thermal_zone0/temp', 'r') as tmpo:
                     temp = int(tmpo.read())
                 return '{:.1f}d'.format(temp / 1000)
             else:
-                try:
-                    wls = ['WL' + i + ': ' + subprocess.check_output('wl -i eth{} phy_tempsense'.format(i).split()).decode('utf-8').split()[0] + 'd' for i in '12']
-                    return ', '.join(wls)
-                except:
-                    pass
-            return ''
+                return ''
 
         status = {}
         status['nodes'] = {}
@@ -165,33 +161,30 @@ class SelfNode(nodes.StatusNode):
         return self.services
 
 
-@app.route('/node/<node_name>/<cmd>/<arg>')
-@app.route('/node/<node_name>/<cmd>')
+@app.route('/node/<node_name>/<path:cmd>')
 @app.route('/node/<node_name>')
 def node(node_name='self', cmd='get_status', arg=''):
     n = selfnode.nodes.get(node_name, selfnode)
+    arg = cmd.split('/')[1:] or []
+    cmd = cmd.split('/')[0]
     if hasattr(n, cmd):
-        if arg:
-            return jsonify({'node': node_name, 'resp': getattr(n, cmd)(*arg.split(','))})
+        r = getattr(n, cmd)(*arg)
+        if cmd == 'node':
+            return jsonify(r)
+        else:
+            return jsonify({'node': node_name, 'resp': r})
         return jsonify({'node': node_name, 'resp': getattr(n, cmd)()})
     else:
         return 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n))), 404
 
+        
 
-@app.route('/aqi_icon/<aqi>')
-def aqi_icon(aqi):
-    from aqimonitor import icon as __icon
-    return Response(__icon(aqi), content_type='image/png')
-
-
-@app.route('/aqi_pred')
-def aqi_pred():
-    from AqiSprintarsForecast import predict
-    return jsonify({
-        'tomorrow': predict(0),
-        'the_day_after_tomorrow': predict(24)
-    })
-
+@app.route('/reload')
+def reload():
+    from pathlib import Path
+    Path(__file__).touch()
+    return 'OK'
+        
 
 @app.route('/')
 @app.route('/<path:p>')
