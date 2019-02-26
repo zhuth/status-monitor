@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import requests, subprocess, json, os, sys
+import requests, subprocess, json, os, sys, base64
 from flask import Response
 
 class StatusNode:
@@ -44,6 +44,9 @@ class StatusNode:
             except TimeoutError:
                 pass
             except KeyError:
+                pass
+            except json.decoder.JSONDecodeError:
+                print('Error while loading from {}'.format(self.ip))
                 pass
         return self.services if isinstance(self.services, list) else []
 
@@ -97,7 +100,7 @@ class StatusNode:
         op = '/'.join(other_params)
         if op: op = '/' + op
         resp = StatusNode.__curl('http://{}:10000/node/{}{}'.
-                                 format(self.ip, node_name, op))
+                                 format(self.ip, node_name, op), timeout=2)
         if resp.headers['content-type'] == 'application/json':
             return json.loads(resp.content.decode('utf-8'))
         else:
