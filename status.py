@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, request, redirect
 import os, psutil, json, time, base64, sys, re, yaml
 import requests
 import subprocess
@@ -172,7 +172,7 @@ def node(node_name='self', cmd='get_status', arg=''):
     if hasattr(n, cmd):
         r = getattr(n, cmd)(*arg)
         if cmd == 'node':
-            return jsonify(r)
+            return jsonify(r) if isinstance(r, dict) else r
         else:
             return jsonify({'node': node_name, 'resp': r})
         return jsonify({'node': node_name, 'resp': getattr(n, cmd)()})
@@ -185,7 +185,7 @@ def node(node_name='self', cmd='get_status', arg=''):
 def reload():
     from pathlib import Path
     Path(__file__).touch()
-    return 'OK'
+    return redirect('./')
         
 
 @app.route('/')

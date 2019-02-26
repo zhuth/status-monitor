@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import requests, subprocess, json, os, base64, time, sys
+import requests, subprocess, json, os, sys
+from flask import Response
 
 class StatusNode:
     """
@@ -13,7 +14,7 @@ class StatusNode:
         self.services = services
 
     @staticmethod
-    def __curl(url, timeout=2):
+    def __curl(url, timeout=0.5):
         try:
             return requests.get(url, timeout=timeout)
         except requests.exceptions.ReadTimeout:
@@ -97,7 +98,10 @@ class StatusNode:
         if op: op = '/' + op
         resp = StatusNode.__curl('http://{}:10000/node/{}{}'.
                                  format(self.ip, node_name, op))
-        return json.loads(resp.content.decode('utf-8'))
+        if resp.headers['content-type'] == 'application/json':
+            return json.loads(resp.content.decode('utf-8'))
+        else:
+            return Response(resp.content, content_type=resp.headers['content-type'])
 
 
 class AirPurifier(StatusNode):
@@ -144,16 +148,16 @@ class AirPurifier(StatusNode):
     def load_services(self):
         return []
         
-    def aqi_icon(aqi):
+    def aqi_icon(self, aqi):
         from aqimonitor import icon as __icon
         return Response(__icon(aqi), content_type='image/png')
 
-    def aqi_pred():
+    def aqi_pred(self):
         from AqiSprintarsForecast import predict
-        return jsonify({
+        return {
             'tomorrow': predict(0),
             'the_day_after_tomorrow': predict(24)
-        })
+        }
         
     def get_status(self):
         return self.call_command('?')
