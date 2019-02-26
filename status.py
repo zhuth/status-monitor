@@ -60,7 +60,9 @@ class SelfNode(nodes.StatusNode):
     
         def temperature():
             if 'temperature_method' in self.config:
-                return eval(self.config['temperature_method'])
+                vars = {}
+                exec(self.config['temperature_method'], globals(), vars)
+                return vars['temp']
             elif os.path.exists('/sys/class/thermal/thermal_zone0/temp'):
                 with open('/sys/class/thermal/thermal_zone0/temp', 'r') as tmpo:
                     temp = int(tmpo.read())
