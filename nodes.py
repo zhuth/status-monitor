@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import requests, subprocess, json
+import requests, subprocess, json, os, sys
 
 class StatusNode:
     """
@@ -32,7 +32,7 @@ class StatusNode:
 
     def ping(self):
         if self.ip:
-            return os.system('/usr/bin/timeout 1s /bin/ping -c 1 {} > /dev/null'.format(self.ip)) == 0
+            return os.system('/bin/ping -c 1 {} > /dev/null'.format(self.ip)) == 0
 
     def load_services(self):
         if self.services == 'auto' and self.ip:
@@ -88,9 +88,16 @@ class StatusNode:
     def set_service(self, service_name, cmd):
         if self.ip and self.services:
             assert cmd in ['restart', 'reload', 'stop', 'start', 'status']
-            assert StatusNode.__curl('http://{}:10000/node/self/set_service/{},{}'.
+            assert StatusNode.__curl('http://{}:10000/node/self/set_service/{}/{}'.
                                      format(self.ip, service_name, cmd)).status_code == 200
             return True
+
+    def node(self, node_name, *other_params):
+        op = '/'.join(other_params)
+        if op: op = '/' + op
+        resp = StatusNode.__curl('http://{}:10000/node/{}{}'.
+                                 format(self.ip, node_name, op))
+        return json.loads(resp.content.decode('utf-8'))
 
 
 class AirPurifier(StatusNode):
@@ -136,7 +143,18 @@ class AirPurifier(StatusNode):
 
     def load_services(self):
         return []
+        
+    def aqi_icon(aqi):
+        from aqimonitor import icon as __icon
+        return Response(__icon(aqi), content_type='image/png')
 
+    def aqi_pred():
+        from AqiSprintarsForecast import predict
+        return jsonify({
+            'tomorrow': predict(0),
+            'the_day_after_tomorrow': predict(24)
+        })
+        
     def get_status(self):
         return self.call_command('?')
 
