@@ -171,11 +171,13 @@ def node(node_name='self', cmd='get_status', arg=''):
     cmd = cmd.split('/')[0]
     if hasattr(n, cmd):
         r = getattr(n, cmd)(*arg)
-        if cmd == 'node':
-            return jsonify(r) if isinstance(r, dict) else r
+        if isinstance(r, dict):
+            if cmd == 'node':
+                return jsonify(r)
+            else:
+                return jsonify({'node': node_name, 'resp': r})
         else:
-            return jsonify({'node': node_name, 'resp': r})
-        return jsonify({'node': node_name, 'resp': getattr(n, cmd)()})
+            return r
     else:
         return 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n))), 404
 
