@@ -8,13 +8,16 @@ class StatusNode:
     """
     Defines a status node
     """
+    timeout = 1
+
     def __init__(self, ip=None, power_ip=None, services=None):
         self.ip = ip
         self.power_ip = power_ip
         self.services = services
 
     @staticmethod
-    def __curl(url, timeout=0.5):
+    def __curl(url, timeout=None):
+        if timeout is None: timeout = StatusNode.timeout
         try:
             return requests.get(url, timeout=timeout)
         except requests.exceptions.ReadTimeout:
@@ -158,8 +161,8 @@ class AirPurifier(StatusNode):
     def aqi_pred(self):
         from AqiSprintarsForecast import predict
         return {
-            'tomorrow': predict(0),
-            'the_day_after_tomorrow': predict(24)
+            'first_half': predict(0, span=12),
+            'second_half': predict(12, span=12)
         }
         
     def get_status(self):

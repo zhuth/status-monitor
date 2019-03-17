@@ -19,11 +19,11 @@ if os.path.exists('config.yaml'):
     cfg = yaml.load(open('config.yaml', encoding='utf-8'))
 
 socketio = SocketIO(app, async_mode='eventlet')
-
 path = os.path.dirname(__file__) or '.'
 os.chdir(path)
 
 import nodes
+nodes.StatusNode.timeout = cfg.get('timeout', 1)
 
 thread = Thread()
 thread_stop_event = Event()
@@ -38,7 +38,11 @@ class StatsThread(Thread):
             super().__init__()
             
         def run(self):
-            socketio.emit('stats', {'node': self.node_name, 'resp': self.n.get_status()}, namespace='/stats', broadcast=True)
+            try:
+                socketio.emit('stats', {'node': self.node_name, 'resp': self.n.get_status()}, namespace='/stats', broadcast=True)
+            except TimeoutError:
+                pass
+            time.sleep(0)
     
     def __init__(self, nodes, delay):
         self.delay = delay
@@ -75,7 +79,7 @@ class SelfNode(nodes.StatusNode):
         for n in self.config.get('nodes', []):
             name = n['name']
             cls = nodes.__dict__.get(n.get('type'), nodes.StatusNode)
-            if cls == nodes.DelegateNode:
+            if cls is nodes.DelegateNode:
                 n = nodes.DelegateNode(name, self.nodes[n.get('parent')])
             else:
                 if 'type' in n: del n['type']
