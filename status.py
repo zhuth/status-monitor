@@ -26,7 +26,11 @@ class SelfNode(nodes.StatusNode):
         nodes.StatusNode.__init__(self, ip='localhost', services='auto')
         self.serv_procs = {}
         self.nodes = {}
-        if subprocess.call('which systemctl'.split()) == 0:
+        try:
+            rs = subprocess.call('which systemctl'.split())
+        except:
+            rs = 2
+        if rs == 0:
             self._service_cmd = 'systemctl {cmd} {name}'
         elif os.path.exists('/etc/init.d'):
             self._service_cmd = '/etc/init.d/{name} {cmd}'
