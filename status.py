@@ -2,17 +2,60 @@
 # -*- coding: utf-8 -*-
 
 from flask import Flask, Response, jsonify, request, redirect
+from flask_socketio import SocketIO, send, emit
+
 import os, psutil, json, time, base64, sys, re, yaml
 import requests
 import subprocess
+from threading import Thread, Event
+
+import eventlet
+eventlet.monkey_patch()
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'
+cfg = {}
+if os.path.exists('config.yaml'):
+    cfg = yaml.load(open('config.yaml', encoding='utf-8'))
 
-path = os.path.dirname(__file__) or './'
+socketio = SocketIO(app, async_mode='eventlet')
+
+path = os.path.dirname(__file__) or '.'
 os.chdir(path)
 
 import nodes
 
+thread = Thread()
+thread_stop_event = Event()
+
+
+class StatsThread(Thread):
+
+    class QueryThread(Thread):
+        def __init__(self, node_name, n):
+            self.node_name = node_name
+            self.n = n
+            super().__init__()
+            
+        def run(self):
+            socketio.emit('stats', {'node': self.node_name, 'resp': self.n.get_status()}, namespace='/stats', broadcast=True)
+    
+    def __init__(self, nodes, delay):
+        self.delay = delay
+        self.nodes = nodes
+        super(StatsThread, self).__init__()
+        
+    def query(self):    
+        socketio.emit('stats', {'node': 'self', 'resp': selfnode.get_status()}, namespace='/stats', broadcast=True)
+        for node_name, n in self.nodes.items():
+            StatsThread.QueryThread(node_name, n).start()
+        
+    def run(self):
+        while not thread_stop_event.isSet():
+            self.query()
+            time.sleep(self.delay)
+            
+        
 class SelfNode(nodes.StatusNode):
     """
     Detect system mode
@@ -23,24 +66,22 @@ class SelfNode(nodes.StatusNode):
         self.nodes = {}
         if subprocess.call('which systemctl'.split()) == 0:
             self._service_cmd = 'systemctl {cmd} {name}'
-        #elif subprocess.call('which service'.split()) == 0:
-        #    self._service_cmd = 'service {name} {cmd}'
         elif os.path.exists('/etc/init.d'):
             self._service_cmd = '/etc/init.d/{name} {cmd}'
         elif os.path.exists('/opt/etc/init.d'):
             self._service_cmd = '/opt/etc/init.d/{name} {cmd}'
 
-        if os.path.exists('config.yaml'):
-            self.config = yaml.load(open('config.yaml'))
-            for n in self.config.get('nodes', []):
-                name = n['name']
-                cls = nodes.__dict__.get(n.get('type'), nodes.StatusNode)
+        self.config = cfg
+        for n in self.config.get('nodes', []):
+            name = n['name']
+            cls = nodes.__dict__.get(n.get('type'), nodes.StatusNode)
+            if cls == nodes.DelegateNode:
+                n = nodes.DelegateNode(name, self.nodes[n.get('parent')])
+            else:
                 if 'type' in n: del n['type']
                 del n['name']
                 n = cls(**n)
-                self.nodes[name] = n
-
-        self.load_services()
+            self.nodes[name] = n
 
     def detect_power(self):
         return True
@@ -69,6 +110,8 @@ class SelfNode(nodes.StatusNode):
                 return '{:.1f}d'.format(temp / 1000)
             else:
                 return ''
+                
+        if self.services == 'auto': self.load_services()
 
         status = {}
         status['nodes'] = {}
@@ -181,7 +224,6 @@ def node(node_name='self', cmd='get_status', arg=''):
     else:
         return 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n))), 404
 
-        
 
 @app.route('/reload')
 def reload():
@@ -201,19 +243,28 @@ def index(p='index.html'):
                 'css': 'text/css'
             }.get(p.split('.')[-1], 'text/plain'))
     return 'Not Found', 404
+    
+    
+@socketio.on('connect', namespace='/stats')
+def stats_connect():
+    global thread
+    emit('notify', {'data': 'Connected'})
+    print('Client connected')
+    
+    if thread.isAlive():
+        thread.query()
+    else:
+        print("Starting Thread")
+        thread = StatsThread(selfnode.nodes, cfg.get('interval', 30))
+        thread.start()
 
 
 if __name__ == '__main__':
-
     if not os.path.exists('bootstrap.min.css'):
         os.system('wget -c https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js')
         os.system('wget -c https://stackpath.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js')
         os.system('wget -c https://stackpath.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css')
+        os.system('wget -c https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js')
 
-    if len(sys.argv) > 1 and sys.argv[1] == 'loop':
-        while True:
-            os.system('nohup python3 status.py > /dev/null')
-            time.sleep(1)
-    else:
-        selfnode = SelfNode()
-        app.run(host='0.0.0.0', port=10000, debug=True)
+    selfnode = SelfNode()
+    socketio.run(app, host='0.0.0.0', port=10000, debug=True)

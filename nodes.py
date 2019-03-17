@@ -233,3 +233,25 @@ class KonkeNode(StatusNode):
     def load_services(self):
         pass
 
+
+class DelegateNode:
+    
+    def __init__(self, name, parent):
+        self.parent = parent
+        self.name = name
+        self.services = []
+        
+    @staticmethod
+    def resp(r):
+        if isinstance(r, dict): return r.get('resp')
+        return r
+        
+    def __getattr__(self, name):
+        def deal(*args):
+            return DelegateNode.resp(self.parent.node(self.name, name, *args))
+        return deal
+    
+    def load_services(self):
+        if not self.services:
+            self.services = DelegateNode.resp(self.parent.node(self.name, 'load_services'))
+        return self.services
