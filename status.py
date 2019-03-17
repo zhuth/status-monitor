@@ -2,12 +2,10 @@
 # -*- coding: utf-8 -*-
 
 from flask import Flask, Response, jsonify, request, redirect
-from flask_socketio import SocketIO, send, emit
 
 import os, psutil, json, time, base64, sys, re, yaml
 import requests
 import subprocess
-from threading import Thread, Event
 
 path = os.path.dirname(__file__) or '.'
 os.chdir(path)
@@ -201,9 +199,18 @@ def reload():
     return redirect('./')
         
 
-@app.route('/')
+@app.route('/', methods=["GET", "POST"])
 @app.route('/<path:p>')
 def index(p='index.html'):
+    if cfg.get('password'):
+        if request.form.get('pass') == cfg.get('password'):
+            resp = Response('''<html><script>location.href='./'</script>
+            ''')
+            resp.set_cookie('auth', 'FF')
+            return resp
+        elif request.cookies.get('auth') != 'FF':
+            return Response('''<html><form method="post" action=""><input type="password" name="pass"></form>
+            ''')
     if p and os.path.exists(p):
         with open(p, 'rb') as f:
             return Response(f.read(), mimetype={
@@ -223,60 +230,8 @@ if __name__ == '__main__':
 
     selfnode = SelfNode()
     if cfg.get('websocket', True):
-        if cfg.get('async_mode', 'gevent') == 'eventlet':
-            import eventlet
-            eventlet.monkey_patch()
-        socketio = SocketIO(app, async_mode=cfg.get('async_mode', 'gevent'))
-        
-        thread = Thread()
-        thread_stop_event = Event()
-
-
-        class StatsThread(Thread):
-
-            class QueryThread(Thread):
-                def __init__(self, node_name, n):
-                    self.node_name = node_name
-                    self.n = n
-                    super().__init__()
-                    
-                def run(self):
-                    try:
-                        socketio.emit('stats', {'node': self.node_name, 'resp': self.n.get_status()}, namespace='/stats', broadcast=True)
-                    except TimeoutError:
-                        pass
-                    time.sleep(0)
-            
-            def __init__(self, nodes, delay):
-                self.delay = delay
-                self.nodes = nodes
-                super(StatsThread, self).__init__()
-                
-            def query(self):    
-                socketio.emit('stats', {'node': 'self', 'resp': selfnode.get_status()}, namespace='/stats', broadcast=True)
-                for node_name, n in self.nodes.items():
-                    StatsThread.QueryThread(node_name, n).start()
-                
-            def run(self):
-                while not thread_stop_event.isSet():
-                    self.query()
-                    time.sleep(self.delay)
-            
-    
-        @socketio.on('connect', namespace='/stats')
-        def stats_connect():
-            global thread
-            emit('notify', {'data': 'Connected'})
-            print('Client connected')
-            
-            if thread.isAlive():
-                thread.query()
-            else:
-                print("Starting Thread")
-                thread = StatsThread(selfnode.nodes, cfg.get('interval', 30))
-                thread.start()
-        
-        socketio.run(app, host='0.0.0.0', port=10000, debug=True)
+        import ws
+        ws.apply(cfg, app, selfnode)
     else:
         print('Web Socket disabled')
         app.run(host='0.0.0.0', port=10000, debug=True)
