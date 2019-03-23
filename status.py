@@ -37,6 +37,9 @@ class SelfNode(nodes.StatusNode):
             self._service_cmd = '/etc/init.d/{name} {cmd}'
         elif os.path.exists('/opt/etc/init.d'):
             self._service_cmd = '/opt/etc/init.d/{name} {cmd}'
+            
+        if not hasattr(os, 'getloadavg'):
+            os.getloadavg = lambda: ''
 
         self.config = cfg
         for n in self.config.get('nodes', []):
@@ -95,23 +98,24 @@ class SelfNode(nodes.StatusNode):
         for _ in self.services:
             if '@' not in _['name']:
                 status['services'][_['name']] = False
+        
+        if self.services:
+            for _ in psutil.process_iter():
+                short_key = _.name() + ':'
+                long_key = short_key + _.username()
+                s = None
+                if short_key in self.serv_procs:
+                    s = self.serv_procs[short_key]
+                if long_key in self.serv_procs:
+                    s = self.serv_procs[long_key]
+                if s is None:
+                    continue
+                if s.get('uname') and s['uname'] != _.username():
+                    continue
+                if s.get('args') and s['args'] not in _.cmdline():
+                    continue
 
-        for _ in psutil.process_iter():
-            short_key = _.name() + ':'
-            long_key = short_key + _.username()
-            s = None
-            if short_key in self.serv_procs:
-                s = self.serv_procs[short_key]
-            if long_key in self.serv_procs:
-                s = self.serv_procs[long_key]
-            if s is None:
-                continue
-            if s.get('uname') and s['uname'] != _.username():
-                continue
-            if s.get('args') and s['args'] not in _.cmdline():
-                continue
-
-            status['services'][s['name']] = True
+                status['services'][s['name']] = True
 
         t = time.time() - psutil.boot_time()
         status['uptime'] = '{}:{:02d}:{:02d}:{:02d} {:.01f}% {} Mem: {}'.format(
