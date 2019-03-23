@@ -54,7 +54,7 @@ class StatusNode:
         return self.services if isinstance(self.services, list) else []
 
     def get_status(self):
-        if self.services and self.ip:
+        if self.services is not None and self.ip:
             try:
                 return json.loads(StatusNode.__curl('http://{}:10000/node/self/get_status'.format(self.ip))
                                   .content.decode('utf-8'))['resp']
