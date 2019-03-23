@@ -4,6 +4,7 @@
 from flask import Flask, Response, jsonify, request, redirect
 
 import os, psutil, json, time, base64, sys, re, yaml
+from datetime import datetime, timedelta
 import requests
 import subprocess
 
@@ -68,8 +69,10 @@ class SelfNode(nodes.StatusNode):
     
         def temperature():
             if 'temperature_method' in self.config:
-                vars = {}
-                exec(self.config['temperature_method'], globals(), vars)
+                vars = {'temp': 'err'}
+                try:
+                    exec(self.config['temperature_method'], globals(), vars)
+                except: pass
                 return vars['temp']
             elif os.path.exists('/sys/class/thermal/thermal_zone0/temp'):
                 with open('/sys/class/thermal/thermal_zone0/temp', 'r') as tmpo:
@@ -210,7 +213,7 @@ def index(p='index.html'):
         if request.form.get('pass') == cfg.get('password'):
             resp = Response('''<html><script>location.href='./'</script>
             ''')
-            resp.set_cookie('auth', 'FF')
+            resp.set_cookie('auth', 'FF', expires=datetime.now()+timedelta(days=90))
             return resp
         elif request.cookies.get('auth') != 'FF':
             return Response('''<html><form method="post" action=""><input type="password" name="pass"></form>

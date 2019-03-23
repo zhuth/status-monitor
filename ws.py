@@ -2,10 +2,10 @@ from flask_socketio import SocketIO, send, emit
 from threading import Thread, Event
 import time
 
-thread = Thread()
 thread_stop_event = Event()
 
 socketio = None
+thread = Thread()
 
 class QueryThread(Thread):
     def __init__(self, node_name, n):
@@ -18,6 +18,8 @@ class QueryThread(Thread):
             socketio.emit('stats', {'node': self.node_name, 'resp': self.n.get_status()}, namespace='/stats', broadcast=True)
         except TimeoutError:
             pass
+        except Exception as ex:
+            socketio.emit('stats', {'node': self.node-name, 'resp': {'error': str(ex)}}, namespace='/stats', broadcast=True)
         time.sleep(0)
         
 
@@ -38,14 +40,6 @@ class StatsThread(Thread):
             self.query()
             time.sleep(self.delay)
     
-    
-def stats_connect():
-    if thread.isAlive():
-        thread.query()
-    else:
-        print("Starting Thread")
-        thread.start()
-        
         
 def apply(cfg, app, selfnode):
     global socketio, thread
@@ -54,15 +48,21 @@ def apply(cfg, app, selfnode):
         eventlet.monkey_patch()
     
     socketio = SocketIO(app, async_mode=cfg.get('async_mode', 'gevent'))
-    thread = StatsThread(selfnode, cfg.get('interval', 30))
     
     @socketio.on('pull', namespace='/stats')
     @socketio.on('connect', namespace='/stats')
     def s_connect():
-        stats_connect()
+        global thread
+        if thread.isAlive():
+            thread.query()
+        else:
+            print("Starting Thread")
+            thread = StatsThread(selfnode, cfg.get('interval', 30))
+            thread.start()
     
     @socketio.on('disconnect', namespace='/stats')
     def s_disconnect():
         thread_stop_event.set()
     
     socketio.run(app, host='0.0.0.0', port=10000, debug=True)
+
