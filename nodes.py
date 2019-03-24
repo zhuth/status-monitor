@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import requests, subprocess, json, os, sys, base64
+import requests, subprocess, json, os, sys, base64, time
 from flask import Response
 
 def _curl(url, timeout=None):
@@ -115,16 +115,20 @@ class ActiveNode(StatusNode):
     def __init__(self, ip=None, power_ip=None):
         StatusNode.__init__(self, ip=ip, power_ip=power_ip, services=[])
         self.status_buf = {}
+        self._last_update = 0
         
     def get_status(self):
-        return self.status_buf
+        if time.time() - self._last_update > 30:
+            self._status_buf = {}
+        return self._status_buf
         
     def load_services(self):
         return self.services
     
     def set_buffer(self, request_json):
-        self.status_buf = request_json['status']
-        self.services = request_json.get('services', [])
+        self._status_buf = request_json['status']
+        if not self.services: self.services = request_json.get('services', [])
+        self._last_update = time.time()
 
 
 class AirPurifier(StatusNode):
@@ -301,7 +305,11 @@ class TpLinkRouterNode(StatusNode):
         from tplink_api.tplink import TpLinkRouter
         self.router = TpLinkRouter(ip)
         self.password = password
-    
+        self.services = [
+            {'name': 'wlan2g', 'dispname': '2.4GHz'},
+            {'name': 'wlan5g', 'dispname': '5GHz'},
+        ]
+        
     def get_status(self):
         self.router.login(self.password)
         wl = self.router.get_wireless()
@@ -312,15 +320,11 @@ class TpLinkRouterNode(StatusNode):
             }
         }
 
-    def load_services(self):
-        return [
-            {'name': 'wlan2g', 'dispname': '2.4GHz'},
-            {'name': 'wlan5g', 'dispname': '5GHz'},
-        ]
-        
     def reboot(self):
         return self.router.reboot()
     
     def set_service(self, service_name, cmd):
+        self.router.login(self.password)
         if service_name in ('wlan2g', 'wlan5g'):
-            self.router.set_wireless(cmd == 'start', service_name[-2:])
+            if cmd == 'restart': self.router.reboot()
+            else: self.router.set_wireless(cmd == 'start', service_name[-2:])

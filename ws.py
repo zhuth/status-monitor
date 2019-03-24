@@ -66,7 +66,6 @@ def apply(cfg, app, selfnode):
     
     @socketio.on('push', namespace='/stats')
     def s_push(data):
-        print('push', data)
         n = selfnode.nodes.get(data['node'])
         if n and hasattr(n, 'set_buffer'):
             n.set_buffer(data)

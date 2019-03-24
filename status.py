@@ -52,7 +52,6 @@ class SelfNode(nodes.StatusNode):
                 if 'type' in n: del n['type']
                 del n['name']
                 n = cls(**n)
-                print(n)
             self.nodes[name] = n
         print('Init done.')
 
@@ -178,12 +177,31 @@ class SelfNode(nodes.StatusNode):
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
+app.config['SECRET_KEY'] = cfg.get('secret_key', 'secret!')
+
+def client_ip():
+    return request.environ.get('HTTP_X_FORWARDED_FOR', request.environ['REMOTE_ADDR']).split(', ')[0]
+    
+    
+def is_authenticated():
+    import fnmatch
+       
+    if 'granted_ips' in cfg:
+        client = client_ip()
+        for ips in cfg['granted_ips']:
+            if client == ips or (('*' in ips or '?' in ips) and fnmatch.fnmatch(client, ips)):
+                return True
+    
+    if 'password' in cfg:
+        return request.cookies.get('auth') == 'FF'
+    
+    return True
 
 
 @app.route('/node/<node_name>/<path:cmd>')
 @app.route('/node/<node_name>')
 def node(node_name='self', cmd='get_status', arg=''):
+    if not is_authenticated(): return 'Forbidden', 403
     n = selfnode.nodes.get(node_name, selfnode)
     arg = cmd.split('/')[1:] or []
     cmd = cmd.split('/')[0]
@@ -224,15 +242,17 @@ def reload():
 @app.route('/', methods=["GET", "POST"])
 @app.route('/<path:p>')
 def index(p='index.html'):
-    if cfg.get('password'):
-        if request.form.get('pass') == cfg.get('password'):
-            resp = Response('''<html><script>location.href='./'</script>
-            ''')
-            resp.set_cookie('auth', 'FF', expires=datetime.now()+timedelta(days=90))
-            return resp
-        elif request.cookies.get('auth') != 'FF':
-            return Response('''<html><form method="post" action=""><input type="password" name="pass"></form>
-            ''')
+    if not is_authenticated():
+        if 'password' in cfg:
+            if request.form.get('pass') == cfg['password']:
+                resp = Response('''<html><script>location.href='./'</script>
+                ''')
+                resp.set_cookie('auth', 'FF', expires=datetime.now()+timedelta(days=90))
+                return resp
+            elif request.cookies.get('auth') != 'FF':
+                return Response('''<html><form method="post" action=""><input type="password" name="pass"></form>
+                ''' + client_ip())
+    
     if p and os.path.exists(p) and p != 'config.yaml':
         with open(p, 'rb') as f:
             return Response(f.read(), mimetype={
