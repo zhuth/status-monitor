@@ -292,3 +292,34 @@ class DelegateNode:
         if not self.services:
             self.services = DelegateNode.resp(self.parent.node(self.name, 'load_services'))
         return self.services
+
+
+class TpLinkRouterNode(StatusNode):
+    
+    def __init__(self, ip, password):
+        StatusNode.__init__(self, ip=ip)
+        from tplink_api.tplink import TpLinkRouter
+        self.router = TpLinkRouter(ip)
+        self.router.login(password)
+    
+    def get_status(self):
+        wl = self.router.get_wireless()
+        return {
+            'services': {
+                'wlan2g': wl['wireless']['wlan_host_2g']['enable'] == "1",
+                'wlan5g': wl['wireless']['wlan_host_5g']['enable'] == "1"
+            }
+        }
+
+    def load_services(self):
+        return [
+            {'name': 'wlan2g', 'dispname': '2.4GHz'},
+            {'name': 'wlan5g', 'dispname': '5GHz'},
+        ]
+        
+    def reboot(self):
+        return self.router.reboot()
+    
+    def set_service(self, service_name, cmd):
+        if service_name in ('wlan2g', 'wlan5g'):
+            self.router.set_wireless(cmd == 'start', service_name[-2:])
