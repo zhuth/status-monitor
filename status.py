@@ -250,26 +250,39 @@ if __name__ == '__main__':
         os.system('wget -c https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js')
 
     selfnode = SelfNode()
+    
+    if cfg.get('parent'):
+        from threading import Thread
+        from socketIO_client import SocketIO as SIOClient, LoggingNamespace
+        parent = cfg['parent']
+        
+        class ActiveNodeThread(Thread):            
+            def run(self):
+                while True:
+                    s = SIOClient(parent, 10000)
+                    st = s.define(LoggingNamespace, '/stats')
+                    with s:
+                        while True:
+                            try:
+                                print('push')
+                                st.emit('push', {
+                                    'node': cfg['name'],
+                                    'status': selfnode.get_status(),
+                                    'services': selfnode.load_services()
+                                })
+                                s.wait(seconds=1)
+                                time.sleep(30)
+                            except KeyboardInterrupt:
+                                exit()
+                            except Exception as ex:
+                                print(ex)
+                                break
+                                
+        ActiveNodeThread().start()
+    
     if cfg.get('websocket', True):
         import ws
         ws.apply(cfg, app, selfnode)
-    elif cfg.get('parent'):
-        from socketIO_client import SocketIO as SIOClient, LoggingNamespace
-        parent = cfg['parent']
-        while True:
-            s = SIOClient(parent, 10000)
-            st = s.define(LoggingNamespace, '/stats')
-            with s:
-                while True:
-                    try:
-                        st.emit('push', {'node': cfg['name'], 'status': selfnode.get_status(), 'services': selfnode.load_services()})
-                        s.wait(seconds=1)
-                        time.sleep(30)
-                    except KeyboardInterrupt:
-                        exit()
-                    except Exception as ex:
-                        print(ex)
-                        break
     else:
         print('Web Socket disabled')
         app.run(host='0.0.0.0', port=10000, debug=True)
