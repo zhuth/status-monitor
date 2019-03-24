@@ -22,7 +22,7 @@ class QueryThread(Thread):
             socketio.emit('stats', {'node': self.node-name, 'resp': {'error': str(ex)}}, namespace='/stats', broadcast=True)
         time.sleep(0)
         
-
+        
 class StatsThread(Thread):
     
     def __init__(self, selfnode, delay):
@@ -63,6 +63,12 @@ def apply(cfg, app, selfnode):
     @socketio.on('disconnect', namespace='/stats')
     def s_disconnect():
         thread_stop_event.set()
+    
+    @socketio.on('push', namespace='/stats')
+    def s_push(data):
+        n = selfnode.nodes.get(data['node'])
+        if n and hasattr(n, 'set_buffer'):
+            n.set_buffer(data)
     
     socketio.run(app, host='0.0.0.0', port=10000, debug=True)
 

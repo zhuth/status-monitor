@@ -200,6 +200,17 @@ def node(node_name='self', cmd='get_status', arg=''):
             return jsonify({'error': str(ex), 'callstack': traceback.format_exc()})
     else:
         return 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n))), 404
+        
+        
+@app.route('/node/<node_name>', methods=["PUT"])
+def node_put_status(node_name):
+    n = selfnode.nodes.get(node_name, None)
+    if n is None:
+        return 'No such node.', 404
+    elif not isinstance(n, nodes.ActiveNode):
+        return 'Node {} is not an active node.', 400
+    n.set_buffer(request.get_json())
+    return 'Updated', 201
 
 
 @app.route('/reload')
@@ -242,6 +253,20 @@ if __name__ == '__main__':
     if cfg.get('websocket', True):
         import ws
         ws.apply(cfg, app, selfnode)
+    elif cfg.get('parent'):
+        from socketIO_client import SocketIO as SIOClient, LoggingNamespace
+        
+        while True:
+            with SIOClient(parent, 10000, LoggingNamespace) as s:
+                while True:
+                    try:
+                        s.emit('push', {'status': self.selfnode.get_status(), 'services': self.selfnode.load_services()})
+                        s.wait(seconds=1)
+                        time.sleep(30)
+                    except KeyboardInterrupt:
+                        exit()
+                    except:
+                        break
     else:
         print('Web Socket disabled')
         app.run(host='0.0.0.0', port=10000, debug=True)

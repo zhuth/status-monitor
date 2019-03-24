@@ -4,6 +4,16 @@
 import requests, subprocess, json, os, sys, base64
 from flask import Response
 
+def _curl(url, timeout=None):
+    if timeout is None: timeout = StatusNode.timeout
+    try:
+        return requests.get(url, timeout=timeout)
+    except requests.exceptions.ReadTimeout:
+        raise TimeoutError
+    except requests.exceptions.ConnectionError:
+        raise TimeoutError
+
+
 class StatusNode:
     """
     Defines a status node
@@ -15,24 +25,8 @@ class StatusNode:
         self.power_ip = power_ip
         self.services = services
 
-    @staticmethod
-    def __curl(url, timeout=None):
-        if timeout is None: timeout = StatusNode.timeout
-        try:
-            return requests.get(url, timeout=timeout)
-        except requests.exceptions.ReadTimeout:
-            raise TimeoutError
-        except requests.exceptions.ConnectionError:
-            raise TimeoutError
-
     def detect_power(self):
-        if self.ip:
-            return self.ping()
-        else:  # with self.power_ip
-            try:
-                return StatusNode.__curl('http://{}/'.format(self.power_ip)).content == b'ON'
-            except TimeoutError:
-                pass
+        return self.ping()
 
     def ping(self):
         if self.ip:
@@ -41,7 +35,7 @@ class StatusNode:
     def load_services(self):
         if self.services == 'auto' and self.ip:
             try:
-                self.services = json.loads(StatusNode.__curl('http://{}:10000/node/self/load_services'
+                self.services = json.loads(_curl('http://{}:10000/node/self/load_services'
                                                              .format(self.ip))
                                            .content.decode('utf-8'))['resp']
             except TimeoutError:
@@ -56,16 +50,22 @@ class StatusNode:
     def get_status(self):
         if self.services is not None and self.ip:
             try:
-                return json.loads(StatusNode.__curl('http://{}:10000/node/self/get_status'.format(self.ip))
+                return json.loads(_curl('http://{}:10000/node/self/get_status'.format(self.ip))
                                   .content.decode('utf-8'))['resp']
             except TimeoutError:
                 return
 
     def power(self, cmd):
-        if self.power_ip:
+        if self.power_ip.startswith("wol:"):
+            if cmd == 'on':
+                wolmac = self.power_ip[4:].replace(':', '-')
+                from wakeonlan import send_magic_packet
+                send_magic_packet(wolmac)
+                return True
+        elif self.power_ip:
             assert cmd in ['on', 'off', 'uflash', 'flash']
-            assert StatusNode.__curl('http://{}/{}'.format(self.power_ip, cmd)).status_code == 200
-        return True
+            assert _curl('http://{}/{}'.format(self.power_ip, cmd)).status_code == 200
+            return True
 
     def force_off(self):
         if self.power_ip:
@@ -75,39 +75,56 @@ class StatusNode:
             return True
 
     def power_on(self):
-        if self.ip and self.power_ip: # computer
+        if self.ip and self.power_ip: # computer with wifi power button
             return self.power('uflash')
-        else:
+        else: # power node
             return self.power('on')
 
     def power_off(self):
         if self.ip and self.services:
-            assert StatusNode.__curl('http://{}:10000/node/self/{}'.format(self.ip, 'power_off')).status_code == 200
+            assert _curl('http://{}:10000/node/self/{}'.format(self.ip, 'power_off')).status_code == 200
         elif self.ip and self.power_ip: # computer
             return self.power('uflash')
         else:
             return self.power('off')
 
     def reboot(self):
-        assert StatusNode.__curl('http://{}:10000/node/self/{}'.format(self.ip, 'reboot')).status_code == 200
+        assert _curl('http://{}:10000/node/self/{}'.format(self.ip, 'reboot')).status_code == 200
         return True
 
     def set_service(self, service_name, cmd):
         if self.ip and self.services:
             assert cmd in ['restart', 'reload', 'stop', 'start', 'status']
-            assert StatusNode.__curl('http://{}:10000/node/self/set_service/{}/{}'.
+            assert _curl('http://{}:10000/node/self/set_service/{}/{}'.
                                      format(self.ip, service_name, cmd)).status_code == 200
             return True
 
     def node(self, node_name, *other_params):
         op = '/'.join(other_params)
         if op: op = '/' + op
-        resp = StatusNode.__curl('http://{}:10000/node/{}{}'.
+        resp = _curl('http://{}:10000/node/{}{}'.
                                  format(self.ip, node_name, op), timeout=2)
         if resp.headers['content-type'] == 'application/json':
             return json.loads(resp.content.decode('utf-8'))
         else:
             return Response(resp.content, content_type=resp.headers['content-type'])
+
+
+class ActiveNode(StatusNode):
+    
+    def __init__(self, ip=None, power_ip=None):
+        StatusNode.__init__(self, ip=ip, power_ip=power_ip, services=[])
+        self.status_buf = {}
+        
+    def get_status(self):
+        return self.status_buf
+        
+    def load_services(self):
+        return self.services
+    
+    def set_buffer(self, request_json):
+        self.status_buf = request_json['status']
+        self.services = request_json.get('services', [])
 
 
 class AirPurifier(StatusNode):
@@ -201,12 +218,35 @@ class AirPurifier(StatusNode):
         return self.call_command('/')
 
 
-class KonkeNode(StatusNode):
+class SwitchNode(StatusNode):
+    """
+    Power Node
+    """
+    def __init__(self, power_ip):
+        super().__init__(self, power_ip=power_ip, services=None)
+    
+    def detect_power(self):        
+        try:
+            return _curl('http://{}/'.format(self.power_ip)).content == b'ON'
+        except TimeoutError:
+            pass
+
+    def load_services(self):
+        pass
+    
+    def reboot(self):
+        pass
+
+    def set_service(self, service_name, cmd):
+        pass
+
+
+class KonkeNode(SwitchNode):
     """
     Konke Switch
     """
     def __init__(self, power_ip):
-        StatusNode.__init__(self, power_ip=power_ip, services=[])
+        super(SwitchNode, self).__init__(self, power_ip)
         from pykonkeio import Switch
         self._konke = Switch(self.power_ip)
 
@@ -226,15 +266,6 @@ class KonkeNode(StatusNode):
     def power_on(self):
         self._konke.turn_on()
         return True
-    
-    def reboot(self):
-        pass
-
-    def set_service(self, service_name, cmd):
-        pass
-
-    def load_services(self):
-        pass
 
 
 class DelegateNode:
