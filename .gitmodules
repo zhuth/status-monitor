@@ -1,0 +1,6 @@
+[submodule "tplink-router-api-newlook"]
+	path = tplink-router-api-newlook
+	url = https://github.com/zhuth/tplink-router-api-newlook
+[submodule "tplink_api"]
+	path = tplink_api
+	url = https://github.com/zhuth/tplink-router-api-newlook
