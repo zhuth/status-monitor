@@ -7,6 +7,7 @@ import os, psutil, json, time, base64, sys, re, yaml
 from datetime import datetime, timedelta
 import requests
 import subprocess
+import traceback
 
 path = os.path.dirname(__file__) or '.'
 os.chdir(path)
@@ -191,14 +192,17 @@ def node(node_name='self', cmd='get_status', arg=''):
     arg = cmd.split('/')[1:] or []
     cmd = cmd.split('/')[0]
     if hasattr(n, cmd):
-        r = getattr(n, cmd)(*arg)
-        if isinstance(r, (Response, tuple)):
-            return r
-        else:
-            if cmd == 'node':
-                return jsonify(r)
+        try:
+            r = getattr(n, cmd)(*arg)
+            if isinstance(r, (Response, tuple)):
+                return r
             else:
-                return jsonify({'node': node_name, 'resp': r})
+                if cmd == 'node':
+                    return jsonify(r)
+                else:
+                    return jsonify({'node': node_name, 'resp': r})
+        except Exception as ex:
+            return jsonify({'error': str(ex), 'callstack': traceback.format_exc()})
     else:
         return 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n))), 404
 
