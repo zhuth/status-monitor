@@ -255,17 +255,20 @@ if __name__ == '__main__':
         ws.apply(cfg, app, selfnode)
     elif cfg.get('parent'):
         from socketIO_client import SocketIO as SIOClient, LoggingNamespace
-        
+        parent = cfg['parent']
         while True:
-            with SIOClient(parent, 10000, LoggingNamespace) as s:
+            s = SIOClient(parent, 10000)
+            st = s.define(LoggingNamespace, '/stats')
+            with s:
                 while True:
                     try:
-                        s.emit('push', {'status': self.selfnode.get_status(), 'services': self.selfnode.load_services()})
+                        st.emit('push', {'node': cfg['name'], 'status': selfnode.get_status(), 'services': selfnode.load_services()})
                         s.wait(seconds=1)
                         time.sleep(30)
                     except KeyboardInterrupt:
                         exit()
-                    except:
+                    except Exception as ex:
+                        print(ex)
                         break
     else:
         print('Web Socket disabled')
