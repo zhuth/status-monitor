@@ -64,12 +64,7 @@ class SelfNode(nodes.StatusNode):
     def get_status(self):
     
         def meminfo():
-            if os.path.exists('/proc/meminfo'):
-                with open('/proc/meminfo', 'r') as f:
-                    total = f.readline().split()[-2]
-                    free  = f.readline().split()[-2]
-                return '{:.1f}%'.format(100-100.0*float(free)/float(total))
-            return ''
+            return '{:.1f}%'.format(psutil.virtual_memory().percent)
     
         def temperature():
             if 'temperature_method' in self.config:
