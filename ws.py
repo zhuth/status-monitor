@@ -19,7 +19,7 @@ class QueryThread(Thread):
         except TimeoutError:
             pass
         except Exception as ex:
-            socketio.emit('stats', {'node': self.node-name, 'resp': {'error': str(ex)}}, namespace='/stats', broadcast=True)
+            socketio.emit('stats', {'node': self.node_name, 'resp': {'error': str(ex)}}, namespace='/stats', broadcast=True)
         time.sleep(0)
         
         
@@ -66,6 +66,7 @@ def apply(cfg, app, selfnode):
     
     @socketio.on('push', namespace='/stats')
     def s_push(data):
+        print('push', data)
         n = selfnode.nodes.get(data['node'])
         if n and hasattr(n, 'set_buffer'):
             n.set_buffer(data)

@@ -232,7 +232,7 @@ def index(p='index.html'):
         elif request.cookies.get('auth') != 'FF':
             return Response('''<html><form method="post" action=""><input type="password" name="pass"></form>
             ''')
-    if p and os.path.exists(p):
+    if p and os.path.exists(p) and p != 'config.yaml':
         with open(p, 'rb') as f:
             return Response(f.read(), mimetype={
                 'html': 'text/html',

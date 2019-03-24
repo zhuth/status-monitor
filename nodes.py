@@ -58,9 +58,9 @@ class StatusNode:
     def power(self, cmd):
         if self.power_ip.startswith("wol:"):
             if cmd == 'on':
-                wolmac = self.power_ip[4:].replace(':', '-')
+                wolmac = self.power_ip[4:].replace(':', '-').strip()
                 from wakeonlan import send_magic_packet
-                send_magic_packet(wolmac)
+                send_magic_packet(wolmac, ip_address='.'.join(self.ip.split('.')[:3]+['255']))
                 return True
         elif self.power_ip:
             assert cmd in ['on', 'off', 'uflash', 'flash']
@@ -75,7 +75,7 @@ class StatusNode:
             return True
 
     def power_on(self):
-        if self.ip and self.power_ip: # computer with wifi power button
+        if self.ip and self.power_ip and not self.power_ip.startswith('wol:'): # computer with wifi power button
             return self.power('uflash')
         else: # power node
             return self.power('on')
