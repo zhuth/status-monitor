@@ -52,6 +52,7 @@ class SelfNode(nodes.StatusNode):
                 if 'type' in n: del n['type']
                 del n['name']
                 n = cls(**n)
+                print(n)
             self.nodes[name] = n
         print('Init done.')
 

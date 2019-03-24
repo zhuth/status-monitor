@@ -270,10 +270,10 @@ class KonkeNode(SwitchNode):
 
 class DelegateNode:
     
-    def __init__(self, name, parent):
+    def __init__(self, name, parent, services=[]):
         self.parent = parent
         self.name = name
-        self.services = []
+        self.services = services
         
     @staticmethod
     def resp(r):
@@ -289,7 +289,7 @@ class DelegateNode:
         return deal
     
     def load_services(self):
-        if not self.services:
+        if self.services == "auto":
             self.services = DelegateNode.resp(self.parent.node(self.name, 'load_services'))
         return self.services
 
@@ -300,11 +300,12 @@ class TpLinkRouterNode(StatusNode):
         StatusNode.__init__(self, ip=ip)
         from tplink_api.tplink import TpLinkRouter
         self.router = TpLinkRouter(ip)
-        self.router.login(password)
+        self.password = password
     
     def get_status(self):
+        self.router.login(self.password)
         wl = self.router.get_wireless()
-        return {
+        return { # "wl":wl,
             'services': {
                 'wlan2g': wl['wireless']['wlan_host_2g']['enable'] == "1",
                 'wlan5g': wl['wireless']['wlan_host_5g']['enable'] == "1"
