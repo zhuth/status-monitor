@@ -251,7 +251,10 @@ class DelegateNode:
         
     def __getattr__(self, name):
         def deal(*args):
-            return DelegateNode.resp(self.parent.node(self.name, name, *args))
+            try:
+                return DelegateNode.resp(self.parent.node(self.name, name, *args))
+            except TimeoutError:
+                pass
         return deal
     
     def load_services(self):
