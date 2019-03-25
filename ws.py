@@ -64,7 +64,7 @@ def apply(cfg, app, selfnode):
     def s_disconnect():
         thread_stop_event.set()
     
-    @socketio.on('push', namespace='/stats')
+    @socketio.on('push', namespace='/nodes')
     def s_push(data):
         n = selfnode.nodes.get(data['node'])
         if n and hasattr(n, 'set_buffer'):

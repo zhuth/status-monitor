@@ -118,8 +118,10 @@ class ActiveNode(StatusNode):
         self._last_update = 0
         
     def get_status(self):
-        if time.time() - self._last_update > 30:
+        if time.time() - self._last_update > 60:
             self._status_buf = {}
+        if not self._status_buf:
+            self.set_buffer({'status': json.loads('http://{}:10000/node/self').format(self.ip)})
         return self._status_buf
         
     def load_services(self):

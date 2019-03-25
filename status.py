@@ -281,7 +281,7 @@ if __name__ == '__main__':
             def run(self):
                 while True:
                     s = SIOClient(parent, 10000)
-                    st = s.define(LoggingNamespace, '/stats')
+                    st = s.define(LoggingNamespace, '/nodes')
                     with s:
                         while True:
                             try:
