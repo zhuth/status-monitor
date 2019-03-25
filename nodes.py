@@ -114,7 +114,7 @@ class ActiveNode(StatusNode):
     
     def __init__(self, ip=None, power_ip=None):
         StatusNode.__init__(self, ip=ip, power_ip=power_ip, services=[])
-        self.status_buf = {}
+        self._status_buf = {}
         self._last_update = 0
         
     def get_status(self):
