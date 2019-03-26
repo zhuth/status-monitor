@@ -102,8 +102,7 @@ class StatusNode:
     def node(self, node_name, *other_params):
         op = '/'.join(other_params)
         if op: op = '/' + op
-        resp = _curl('http://{}:10000/node/{}{}'.
-                                 format(self.ip, node_name, op), timeout=2)
+        resp = _curl('http://{}:10000/node/{}{}'.format(self.ip, node_name, op), timeout=2)
         if resp.headers['content-type'] == 'application/json':
             return json.loads(resp.content.decode('utf-8'))
         else:
@@ -121,7 +120,7 @@ class ActiveNode(StatusNode):
         if time.time() - self._last_update > 60:
             self._status_buf = {}
         if not self._status_buf:
-            self.set_buffer({'status': json.loads('http://{}:10000/node/self').format(self.ip)})
+            self.set_buffer({'status': json.loads(_curl('http://{}:10000/node/self'.format(self.ip)).content.decode('utf-8'))})
         return self._status_buf
         
     def load_services(self):
@@ -245,6 +244,14 @@ class SwitchNode(StatusNode):
 
     def set_service(self, service_name, cmd):
         pass
+        
+    def power_off(self):
+        self.power('off')
+        return True
+    
+    def power_on(self):
+        self.power('on')
+        return True
 
 
 class KonkeNode(SwitchNode):

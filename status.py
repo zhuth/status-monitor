@@ -216,7 +216,7 @@ def node(node_name='self', cmd='get_status', arg=''):
                 else:
                     return jsonify({'node': node_name, 'resp': r})
         except Exception as ex:
-            return jsonify({'error': str(ex), 'callstack': traceback.format_exc()})
+            return jsonify({'error': repr(ex), 'callstack': traceback.format_exc()})
     else:
         return 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n))), 404
         
