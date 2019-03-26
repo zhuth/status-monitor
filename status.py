@@ -71,7 +71,8 @@ class SelfNode(nodes.StatusNode):
                 vars = {'temp': 'err'}
                 try:
                     exec(self.config['temperature_method'], globals(), vars)
-                except: pass
+                except Exception as ex:
+                    vars['temp'] = 'err: ' + str(ex)
                 return vars['temp']
             elif os.path.exists('/sys/class/thermal/thermal_zone0/temp'):
                 with open('/sys/class/thermal/thermal_zone0/temp', 'r') as tmpo:
@@ -123,6 +124,15 @@ class SelfNode(nodes.StatusNode):
         return status
 
     def power_off(self):
+        if 'shutdown' in self.config:
+            vars = {'message': 'err'}
+            try:
+                exec(self.config['shutdown'], globals(), vars)
+            except Exception as ex:
+                vars['message'] = 'err: ' + str(ex)
+                pass
+            return vars['message']
+            
         os.system('shutdown now')
         return True
     
@@ -216,7 +226,7 @@ def node(node_name='self', cmd='get_status', arg=''):
                 else:
                     return jsonify({'node': node_name, 'resp': r})
         except Exception as ex:
-            return jsonify({'error': str(ex), 'callstack': traceback.format_exc()})
+            return jsonify({'error': repr(ex), 'callstack': traceback.format_exc()})
     else:
         return 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n))), 404
         
