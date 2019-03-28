@@ -1,0 +1,8 @@
+flask
+flask-socketio
+pykonkeio==1.0.5
+socketio_client
+psutil
+wakeonlan
+pyserial
+pyyaml
