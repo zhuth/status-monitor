@@ -128,7 +128,7 @@ class StatusNode:
 class AirPurifier(StatusNode):
 
     def __init__(self, socket='/tmp/aqimonitor.socket'):
-        super.__init__()
+        super().__init__()
         import aqimonitor
         self.socket = socket
         self.aqi_colors = aqimonitor.aqi_colors
