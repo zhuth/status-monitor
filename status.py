@@ -47,13 +47,15 @@ class SelfNode(nodes.StatusNode):
             name = n['name']
             cls = nodes.__dict__.get(n.get('type'), nodes.StatusNode)
             if cls is nodes.DelegateNode:
-                n = nodes.DelegateNode(name, self.nodes[n.get('parent')])
+                if 'parent' not in n: continue
+                del n['type']
+                n['parent'] = self.nodes[n['parent']]
+                n = nodes.DelegateNode(**n)
             else:
                 if 'type' in n: del n['type']
                 del n['name']
                 n = cls(**n)
             self.nodes[name] = n
-        print('Init done.')
 
     def detect_power(self):
         return True
@@ -61,7 +63,7 @@ class SelfNode(nodes.StatusNode):
     def ping(self):
         return True
 
-    def get_status(self):
+    def _get_status(self):
     
         def meminfo():
             return '{:.1f}%'.format(psutil.virtual_memory().percent)
