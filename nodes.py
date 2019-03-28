@@ -64,7 +64,7 @@ class StatusNode:
         return self._status_buf
 
     def set_buffer(self, request_json):
-        self._status_buf = request_json['status']
+        self._status_buf = request_json['status'] or {}
         if not self.services: self.services = request_json.get('services', [])
         self._last_update = time.time()
         self._status_buf['_last_update'] = self._last_update
