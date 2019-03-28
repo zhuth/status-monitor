@@ -20,10 +20,13 @@ class StatusNode:
     """
     timeout = 1
 
-    def __init__(self, ip=None, power_ip=None, services=None):
+    def __init__(self, ip=None, power_ip=None, services=None, interval=0):
         self.ip = ip
         self.power_ip = power_ip
         self.services = services
+        self.interval = interval
+        self._status_buf = {}
+        self._last_update = 0
 
     def detect_power(self):
         return self.ping()
@@ -46,15 +49,26 @@ class StatusNode:
                 print('Error while loading from {}'.format(self.ip))
                 pass
         return self.services if isinstance(self.services, list) else []
-
-    def get_status(self):
+        
+    def _get_status(self):
         if self.services is not None and self.ip:
             try:
-                return json.loads(_curl('http://{}:10000/node/self/get_status'.format(self.ip))
+                return json.loads(_curl('http://{}:10000/node/self'.format(self.ip))
                                   .content.decode('utf-8'))['resp']
             except TimeoutError:
-                return
+                pass
 
+    def get_status(self):
+        if time.time() - self._last_update > self.interval:
+            self.set_buffer({'status': self._get_status()})
+        return self._status_buf
+
+    def set_buffer(self, request_json):
+        self._status_buf = request_json['status']
+        if not self.services: self.services = request_json.get('services', [])
+        self._last_update = time.time()
+        self._status_buf['_last_update'] = self._last_update
+    
     def power(self, cmd):
         if self.power_ip.startswith("wol:"):
             if cmd == 'on':
@@ -97,6 +111,8 @@ class StatusNode:
             assert cmd in ['restart', 'reload', 'stop', 'start', 'status']
             assert _curl('http://{}:10000/node/self/set_service/{}/{}'.
                                      format(self.ip, service_name, cmd)).status_code == 200
+
+            self._last_update = 0
             return True
 
     def node(self, node_name, *other_params):
@@ -109,33 +125,10 @@ class StatusNode:
             return Response(resp.content, content_type=resp.headers['content-type'])
 
 
-class ActiveNode(StatusNode):
-    
-    def __init__(self, ip=None, power_ip=None):
-        StatusNode.__init__(self, ip=ip, power_ip=power_ip, services=[])
-        self._status_buf = {}
-        self._last_update = 0
-        
-    def get_status(self):
-        if time.time() - self._last_update > 60:
-            self._status_buf = {}
-        if not self._status_buf:
-            self.set_buffer({'status': json.loads(_curl('http://{}:10000/node/self'.format(self.ip)).content.decode('utf-8'))})
-        return self._status_buf
-        
-    def load_services(self):
-        return self.services
-    
-    def set_buffer(self, request_json):
-        self._status_buf = request_json['status']
-        if not self.services: self.services = request_json.get('services', [])
-        self._last_update = time.time()
-
-
 class AirPurifier(StatusNode):
 
     def __init__(self, socket='/tmp/aqimonitor.socket'):
-        StatusNode.__init__(self)
+        super.__init__()
         import aqimonitor
         self.socket = socket
         self.aqi_colors = aqimonitor.aqi_colors
@@ -187,7 +180,7 @@ class AirPurifier(StatusNode):
             'second_half': predict(12, span=12)
         }
         
-    def get_status(self):
+    def _get_status(self):
         return self.call_command('?')
 
     def show(self, text):
@@ -269,8 +262,8 @@ class KonkeNode(SwitchNode):
     def ping(self):
         return self._konke.status != 'offline'
 
-    def get_status(self):
-        pass
+    def _get_status(self):
+        return {}
 
     def power_off(self):
         self._konke.turn_off()
@@ -281,17 +274,28 @@ class KonkeNode(SwitchNode):
         return True
 
 
-class DelegateNode:
+class DelegateNode(StatusNode):
     
-    def __init__(self, name, parent, services=[]):
+    def __init__(self, name, parent, services=None, interval=0):
+        super().__init__(services=services, interval=interval)
         self.parent = parent
         self.name = name
-        self.services = services
         
     @staticmethod
     def resp(r):
         if isinstance(r, dict): return r.get('resp')
         return r
+        
+    def _get_status(self):
+        return DelegateNode.resp(self.parent.node(self.name, 'get_status'))
+        
+    def set_service(self, service_name, cmd):
+        r = DelegateNode.resp(self.parent.node(self.name, 'set_service'))
+        self._last_update = 0
+        return r
+        
+    def get_status(self):
+        return super().get_status()
         
     def __getattr__(self, name):
         def deal(*args):
@@ -309,8 +313,8 @@ class DelegateNode:
 
 class TpLinkRouterNode(StatusNode):
     
-    def __init__(self, ip, password):
-        StatusNode.__init__(self, ip=ip)
+    def __init__(self, ip, password, interval=0):
+        super().__init__(ip=ip, interval=interval)
         from tplink_api.tplink import TpLinkRouter
         self.router = TpLinkRouter(ip)
         self.password = password
@@ -319,7 +323,7 @@ class TpLinkRouterNode(StatusNode):
             {'name': 'wlan5g', 'dispname': '5GHz'},
         ]
         
-    def get_status(self):
+    def _get_status(self):
         self.router.login(self.password)
         wl = self.router.get_wireless()
         return { # "wl":wl,
