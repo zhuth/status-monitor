@@ -176,6 +176,9 @@ class AirPurifier(StatusNode):
     def load_services(self):
         return []
         
+    def detect_power(self):
+        return True
+        
     def aqi_icon(self, aqi):
         from aqimonitor import icon as __icon
         return Response(__icon(aqi), content_type='image/png')
@@ -204,17 +207,14 @@ class AirPurifier(StatusNode):
     def toggle(self):
         return self.call_command('-')
 
-    def speed0(self):
-        return self.call_command('0')
-
     def speed1(self):
         return self.call_command('1')
 
     def speed2(self):
         return self.call_command('2')
-
-    def speed3(self):
-        return self.call_command('x')
+        
+    def power(self, onoff):
+        self.call_command('0' if onoff == 'off' else 'x')
 
     def bgon(self):
         return self.call_command(':')
@@ -295,6 +295,9 @@ class DelegateNode(StatusNode):
         
     def _get_status(self):
         return DelegateNode.resp(self.parent.node(self.name, 'get_status'))
+        
+    def detect_power(self):
+        return DelegateNode.resp(self.parent.node(self.name, 'detect_power'))
         
     def set_service(self, service_name, cmd):
         r = DelegateNode.resp(self.parent.node(self.name, 'set_service'))
