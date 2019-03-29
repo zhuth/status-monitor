@@ -59,13 +59,20 @@ class StatusNode:
                 pass
 
     def get_status(self):
-        if time.time() - self._last_update > self.interval:
-            self.set_buffer({'status': self._get_status()})
+        if time.time() - self._last_update >= self.interval:
+            if not self.detect_power():
+                self._status_buf = {'power': False, '_last_update': time.time()}
+                self._last_update = 0
+            else:
+                self.set_buffer({'status': self._get_status()})
         return self._status_buf
 
-    def set_buffer(self, request_json):
+    def set_buffer(self, request_json, **kwargs):
         self._status_buf = request_json['status'] or {}
         if not self.services: self.services = request_json.get('services', [])
+        
+        self._status_buf['power'] = True
+        
         self._last_update = time.time()
         self._status_buf['_last_update'] = self._last_update
     
@@ -228,6 +235,9 @@ class SwitchNode(StatusNode):
             return _curl('http://{}/'.format(self.power_ip)).content == b'ON'
         except TimeoutError:
             pass
+            
+    def _get_status(self):
+        return {}
 
     def load_services(self):
         pass
@@ -261,9 +271,6 @@ class KonkeNode(SwitchNode):
 
     def ping(self):
         return self._konke.status != 'offline'
-
-    def _get_status(self):
-        return {}
 
     def power_off(self):
         self._konke.turn_off()

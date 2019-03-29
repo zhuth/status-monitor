@@ -3,43 +3,28 @@ from threading import Thread, Event
 import time
 
 thread_stop_event = Event()
+thread_stop_event.set()
 
 socketio = None
 thread = Thread()
 
 class QueryThread(Thread):
-    def __init__(self, node_name, n):
+    def __init__(self, node_name, n, min_interval):
         self.node_name = node_name
         self.n = n
+        self.interval = max(min_interval, self.n.interval)
         super().__init__()
         
     def run(self):
-        try:
-            socketio.emit('stats', {'node': self.node_name, 'resp': self.n.get_status()}, namespace='/stats', broadcast=True)
-        except TimeoutError:
-            pass
-        except Exception as ex:
-            socketio.emit('stats', {'node': self.node_name, 'resp': {'error': str(ex)}}, namespace='/stats', broadcast=True)
-        time.sleep(0)
-        
-        
-class StatsThread(Thread):
-    
-    def __init__(self, selfnode, delay):
-        self.delay = delay
-        self.selfnode = selfnode
-        super(StatsThread, self).__init__()
-        
-    def query(self):
-        for node_name, n in [('self', self.selfnode)] + list(self.selfnode.nodes.items()):
-            QueryThread(node_name, n).start()
-        
-    def run(self):
-        thread_stop_event.clear()
         while not thread_stop_event.isSet():
-            self.query()
-            time.sleep(self.delay)
-    
+            time.sleep(self.interval)
+            try:
+                socketio.emit('stats', {'node': self.node_name, 'resp': self.n.get_status()}, namespace='/stats', broadcast=True)
+            except TimeoutError:
+                pass
+            except Exception as ex:
+                socketio.emit('stats', {'node': self.node_name, 'resp': {'error': str(ex)}}, namespace='/stats', broadcast=True)
+          
         
 def apply(cfg, app, selfnode):
     global socketio, thread
@@ -52,13 +37,15 @@ def apply(cfg, app, selfnode):
     @socketio.on('pull', namespace='/stats')
     @socketio.on('connect', namespace='/stats')
     def s_connect():
-        global thread
-        if thread.isAlive():
-            thread.query()
-        else:
+        nodes = [('self', selfnode)] + list(selfnode.nodes.items())
+        if thread_stop_event.isSet():
             print("Starting Thread")
-            thread = StatsThread(selfnode, cfg.get('interval', 30))
-            thread.start()
+            thread_stop_event.clear()
+            interval = cfg.get('interval', 30)
+            for node_name, n in nodes:
+                QueryThread(node_name, n, interval).start()
+        for node_name, n in nodes:
+            socketio.emit('stats', {'node': node_name, 'resp': n.get_status()}, namespace='/stats', broadcast=True)
     
     @socketio.on('disconnect', namespace='/stats')
     def s_disconnect():

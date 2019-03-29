@@ -86,13 +86,7 @@ class SelfNode(nodes.StatusNode):
         if self.services == 'auto': self.load_services()
 
         status = {}
-        status['nodes'] = {}
-        for name, n in self.nodes.items():
-            status['nodes'][name] = {
-                'power': n.detect_power(),
-                'name': name
-            }
-
+        
         status['services'] = {}
         for _ in self.services:
             if '@' not in _['name']:
