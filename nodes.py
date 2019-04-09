@@ -77,13 +77,7 @@ class StatusNode:
         self._status_buf['_last_update'] = self._last_update
     
     def power(self, cmd):
-        if self.power_ip.startswith("wol:"):
-            if cmd == 'on':
-                wolmac = self.power_ip[4:].replace(':', '-').strip()
-                from wakeonlan import send_magic_packet
-                send_magic_packet(wolmac, ip_address='.'.join(self.ip.split('.')[:3]+['255']))
-                return True
-        elif self.power_ip:
+        if self.power_ip:
             assert cmd in ['on', 'off', 'uflash', 'flash']
             assert _curl('http://{}/{}'.format(self.power_ip, cmd)).status_code == 200
             return True
@@ -96,16 +90,19 @@ class StatusNode:
             return True
 
     def power_on(self):
-        if self.ip and self.power_ip and not self.power_ip.startswith('wol:'): # computer with wifi power button
+        if self.power_ip.startswith("wol:"):
+            wolmac = self.power_ip[4:].replace(':', '-').strip()
+            from wakeonlan import send_magic_packet
+            send_magic_packet(wolmac, ip_address='.'.join(self.ip.split('.')[:3]+['255']))
+            return True
+        elif self.ip and self.power_ip : # computer with wifi power button
             return self.power('uflash')
         else: # power node
             return self.power('on')
 
     def power_off(self):
-        if self.ip and self.services:
+        if self.ip:
             assert _curl('http://{}:10000/node/self/{}'.format(self.ip, 'power_off')).status_code == 200
-        elif self.ip and self.power_ip: # computer
-            return self.power('uflash')
         else:
             return self.power('off')
 
@@ -119,7 +116,7 @@ class StatusNode:
             assert _curl('http://{}:10000/node/self/set_service/{}/{}'.
                                      format(self.ip, service_name, cmd)).status_code == 200
 
-            self._last_update = 0
+            self.refresh_status()
             return True
 
     def node(self, node_name, *other_params):
@@ -130,6 +127,9 @@ class StatusNode:
             return json.loads(resp.content.decode('utf-8'))
         else:
             return Response(resp.content, content_type=resp.headers['content-type'])
+            
+    def refresh_status(self):
+        self._last_update = 0
 
 
 class AirPurifier(StatusNode):
@@ -299,6 +299,12 @@ class DelegateNode(StatusNode):
     def detect_power(self):
         return DelegateNode.resp(self.parent.node(self.name, 'detect_power'))
         
+    def power_on(self):
+        return DelegateNode.resp(self.parent.node(self.name, 'power_on'))
+    
+    def power_off(self):
+        return DelegateNode.resp(self.parent.node(self.name, 'power_off'))
+        
     def set_service(self, service_name, cmd):
         r = DelegateNode.resp(self.parent.node(self.name, 'set_service'))
         self._last_update = 0
@@ -351,3 +357,4 @@ class TpLinkRouterNode(StatusNode):
         if service_name in ('wlan2g', 'wlan5g'):
             if cmd == 'restart': self.router.reboot()
             else: self.router.set_wireless(cmd == 'start', service_name[-2:])
+        self._last_update = 0

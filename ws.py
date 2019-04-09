@@ -10,10 +10,11 @@ thread = Thread()
 
 class QueryThread(Thread):
     def __init__(self, node_name, n, min_interval):
+        super().__init__()
         self.node_name = node_name
         self.n = n
         self.interval = max(min_interval, self.n.interval)
-        super().__init__()
+        print('QueryThread for', node_name, 'started with interval', self.interval)
         
     def run(self):
         while not thread_stop_event.isSet():
