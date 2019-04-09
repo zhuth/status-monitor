@@ -61,6 +61,7 @@ def tcplistener(aport):
             pass
         try:
             skt.bind('/tmp/aqimonitor.socket')
+            os.chmod('/tmp/aqimonitor.socket', 0o777)
             break
         except:
             time.sleep(2)
