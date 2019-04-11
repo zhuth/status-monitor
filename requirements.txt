@@ -6,4 +6,3 @@ psutil
 wakeonlan
 pyserial
 pyyaml
-tornado

@@ -47,7 +47,7 @@ def apply(vars):
             for node_name, n in nodes:
                 QueryThread(node_name, n, interval).start()
         for node_name, n in nodes:
-            socketio.emit('stats', {'node': node_name, 'resp': n.get_status()}, namespace='/stats', broadcast=True)
+            socketio.emit('stats', {'node': node_name, 'resp': n.get_status()}, namespace='/stats')
             
     @socketio.on('request', namespace='/stats')
     def s_node(data):
