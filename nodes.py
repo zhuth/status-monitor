@@ -115,8 +115,6 @@ class StatusNode:
             assert cmd in ['restart', 'reload', 'stop', 'start', 'status']
             assert _curl('http://{}:10000/node/self/set_service/{}/{}'.
                                      format(self.ip, service_name, cmd)).status_code == 200
-
-            self.refresh_status()
             return True
 
     def node(self, node_name, *other_params):
@@ -307,7 +305,6 @@ class DelegateNode(StatusNode):
         
     def set_service(self, service_name, cmd):
         r = DelegateNode.resp(self.parent.node(self.name, 'set_service'))
-        self._last_update = 0
         return r
         
     def get_status(self):
@@ -357,4 +354,3 @@ class TpLinkRouterNode(StatusNode):
         if service_name in ('wlan2g', 'wlan5g'):
             if cmd == 'restart': self.router.reboot()
             else: self.router.set_wireless(cmd == 'start', service_name[-2:])
-        self._last_update = 0
