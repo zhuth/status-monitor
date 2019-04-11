@@ -204,10 +204,8 @@ def is_authenticated():
     return True
 
 
-@app.route('/node/<node_name>/<path:cmd>')
-@app.route('/node/<node_name>')
-def node(node_name='self', cmd='get_status', arg=''):
-    if not is_authenticated(): return 'Forbidden', 403
+def node_call(node_name='self', cmd='get_status', arg=''):
+    if not is_authenticated(): return {'error': 'forbidden'}
     n = selfnode.nodes.get(node_name, selfnode)
     arg = cmd.split('/')[1:] or []
     cmd = cmd.split('/')[0]
@@ -218,13 +216,24 @@ def node(node_name='self', cmd='get_status', arg=''):
                 return r
             else:
                 if cmd == 'node':
-                    return jsonify(r)
+                    return r
                 else:
-                    return jsonify({'node': node_name, 'resp': r})
+                    return {'node': node_name, 'resp': r}
+            n.refresh_status()
         except Exception as ex:
-            return jsonify({'error': repr(ex), 'callstack': traceback.format_exc()})
+            return {'error': repr(ex), 'callstack': traceback.format_exc()}
     else:
-        return 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n))), 404
+        return {'error': 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n)))}
+        
+        
+@app.route('/node/<node_name>/<path:cmd>')
+@app.route('/node/<node_name>')
+def node(node_name='self', cmd='get_status', arg=''):
+    r = node_call(node_name, cmd, arg)    
+    if isinstance(r, (Response, tuple)):
+        return r
+    else:
+        return jsonify(r)
         
         
 @app.route('/node/<node_name>', methods=["PUT"])
@@ -309,7 +318,8 @@ if __name__ == '__main__':
     
     if cfg.get('websocket', True):
         import ws
-        ws.apply(cfg, app, selfnode)
+        vars = globals()
+        ws.apply(vars)
     else:
         print('Web Socket disabled')
         app.run(host='0.0.0.0', port=10000, debug=True)

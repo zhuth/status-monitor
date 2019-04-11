@@ -27,7 +27,8 @@ class QueryThread(Thread):
                 socketio.emit('stats', {'node': self.node_name, 'resp': {'error': str(ex)}}, namespace='/stats', broadcast=True)
           
         
-def apply(cfg, app, selfnode):
+def apply(vars):
+    cfg, app, selfnode = vars['cfg'], vars['app'], vars['selfnode']
     global socketio, thread
     if cfg.get('async_mode', 'gevent') == 'eventlet':
         import eventlet
@@ -47,6 +48,10 @@ def apply(cfg, app, selfnode):
                 QueryThread(node_name, n, interval).start()
         for node_name, n in nodes:
             socketio.emit('stats', {'node': node_name, 'resp': n.get_status()}, namespace='/stats', broadcast=True)
+            
+    @socketio.on('request', namespace='/stats')
+    def s_node(data):
+        socketio.emit('notify', vars['node_call'](data['node_name'], data['cmd'], data['arg']), namespace='/stats')
     
     @socketio.on('disconnect', namespace='/stats')
     def s_disconnect():
