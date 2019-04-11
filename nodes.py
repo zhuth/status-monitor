@@ -90,7 +90,7 @@ class StatusNode:
             return True
 
     def power_on(self):
-        if self.power_ip.startswith("wol:"):
+        if self.power_ip and self.power_ip.startswith("wol:"):
             wolmac = self.power_ip[4:].replace(':', '-').strip()
             from wakeonlan import send_magic_packet
             send_magic_packet(wolmac, ip_address='.'.join(self.ip.split('.')[:3]+['255']))
@@ -212,7 +212,13 @@ class AirPurifier(StatusNode):
         return self.call_command('2')
         
     def power(self, onoff):
-        self.call_command('0' if onoff == 'off' else 'x')
+        return self.call_command('0' if onoff == 'off' else 'x')
+        
+    def power_on(self):
+        return self.power('on')
+        
+    def power_on(self):
+        return self.power('off')
 
     def bgon(self):
         return self.call_command(':')
