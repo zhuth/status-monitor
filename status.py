@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 from flask import Flask, Response, jsonify, request, redirect
@@ -88,11 +88,11 @@ class SelfNode(nodes.StatusNode):
         status = {}
         
         status['services'] = {}
-        for _ in self.services:
-            if '@' not in _['name']:
-                status['services'][_['name']] = False
-        
         if self.services:
+            for _ in self.services:
+                if '@' not in _['name']:
+                    status['services'][_['name']] = False
+        
             for _ in psutil.process_iter():
                 short_key = _.name() + ':'
                 long_key = short_key + _.username()
@@ -109,6 +109,11 @@ class SelfNode(nodes.StatusNode):
                     continue
 
                 status['services'][s['name']] = True
+                
+        if self.nodes:
+            status['nodes'] = {}
+            for _, n in self.nodes.items():
+                status['nodes'][_] = type(n).__name__
 
         t = time.time() - psutil.boot_time()
         status['uptime'] = '{}:{:02d}:{:02d}:{:02d} {:.01f}% {} Mem: {}'.format(
@@ -211,7 +216,9 @@ def node_call(node_name='self', cmd='get_status', arg=''):
     cmd = cmd.split('/')[0]
     if hasattr(n, cmd):
         try:
-            r = getattr(n, cmd)(*arg)
+            r = getattr(n, cmd)
+            if hasattr(r, '__call__'):
+                r = r(*arg)
             if isinstance(r, (Response, tuple)):
                 return r
             else:
@@ -275,7 +282,7 @@ def index(p='index.html'):
                 'json': 'application/json',
                 'css': 'text/css'
             }.get(p.split('.')[-1], 'text/plain'))
-    return 'Not Found', 404
+    return 'Not Found for {}'.format(p), 404
 
 
 if __name__ == '__main__':
