@@ -219,7 +219,7 @@ class AirPurifier(StatusNode):
     
     def power_off(self):
         self.power('off')
-
+        
     def bgon(self):
         return self.call_command(':')
 
