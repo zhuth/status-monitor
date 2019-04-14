@@ -3,6 +3,7 @@
 
 import requests, subprocess, json, os, sys, base64, time
 from flask import Response
+import re
 
 def _curl(url, timeout=None):
     if timeout is None: timeout = StatusNode.timeout
@@ -26,7 +27,7 @@ class StatusNode:
         self.services = services
         self.interval = interval
         self._status_buf = {}
-        self._last_update = 0
+        self.last_update = 0
 
     def detect_power(self):
         return self.ping()
@@ -59,10 +60,10 @@ class StatusNode:
                 pass
 
     def get_status(self):
-        if time.time() - self._last_update >= self.interval:
+        if time.time() - self.last_update >= self.interval:
             if not self.detect_power():
-                self._status_buf = {'power': False, '_last_update': time.time()}
-                self._last_update = 0
+                self._status_buf = {'power': False, 'last_update': time.time()}
+                self.last_update = 0
             else:
                 self.set_buffer({'status': self._get_status()})
         return self._status_buf
@@ -73,8 +74,8 @@ class StatusNode:
         
         self._status_buf['power'] = True
         
-        self._last_update = time.time()
-        self._status_buf['_last_update'] = self._last_update
+        self.last_update = time.time()
+        self._status_buf['last_update'] = self.last_update
     
     def power(self, cmd):
         if self.power_ip:
@@ -127,17 +128,23 @@ class StatusNode:
             return Response(resp.content, content_type=resp.headers['content-type'])
             
     def refresh_status(self):
-        self._last_update = 0
+        self.last_update = 0
 
 
 class AirPurifier(StatusNode):
 
-    def __init__(self, socket='/tmp/aqimonitor.socket'):
+    def __init__(self, socket='/tmp/aqimonitor.socket', city='Beijing'):
         super().__init__()
         import aqimonitor
         self.socket = socket
         self.aqi_colors = aqimonitor.aqi_colors
         self.icon = aqimonitor.icon
+        self.city = city
+
+    def icon_base64(self, aqio):
+        if not isinstance(aqio, str): aqio = str(int(aqio))
+        aqi_icon = self.icon(aqio)
+        return 'data:image/png;base64,' + base64.b64encode(aqi_icon).decode('ascii')
 
     def call_command(self, cmd):
         import socket
@@ -163,8 +170,7 @@ class AirPurifier(StatusNode):
 
         if cmd == '?':
             if r['aqi'] != '-':
-                aqi_icon = self.icon(str(int(r['aqi'])))
-                r['aqi_icon'] = 'data:image/png;base64,' + base64.b64encode(aqi_icon).decode('ascii')
+                r['aqi_icon'] = self.icon_base64(r['aqi'])
                 r['temp'] = str(int(r['temp'])) + 'd'
                 r['hum'] = str(int(r['hum'])) + '%'
         else:
@@ -187,9 +193,19 @@ class AirPurifier(StatusNode):
             'first_half': predict(0, span=12),
             'second_half': predict(12, span=12)
         }
+
+    def city_aqi(self):
+        js = requests.get('http://feed.aqicn.org/feed/{}/en/feed.v1.js'.format(self.city)).content.decode('utf-8')
+        m = re.search(r'>(\d+)<', js)
+        if m:
+            return m.group(1)
         
     def _get_status(self):
-        return self.call_command('?')
+        d = self.call_command('?')
+        pred = self.aqi_pred()
+        d['aqi_pred'] = self.icon_base64('{}:{}'.format(int(pred['first_half']*30), int(pred['second_half']*30)))
+        d['city_aqi'] = self.icon_base64(self.city_aqi())
+        return d
 
     def show(self, text):
         return self.call_command('c' + text)
@@ -275,6 +291,9 @@ class KonkeNode(SwitchNode):
 
     def ping(self):
         return self._konke.status != 'offline'
+        
+    def power(self, onoff):
+        return self.power_off() if onoff == 'off' else self.power_on()
 
     def power_off(self):
         self._konke.turn_off()

@@ -44,6 +44,7 @@ class SelfNode(nodes.StatusNode):
 
         self.config = cfg
         for n in self.config.get('nodes', []):
+            n = dict(n)
             name = n['name']
             cls = nodes.__dict__.get(n.get('type'), nodes.StatusNode)
             if cls is nodes.DelegateNode:
@@ -165,19 +166,6 @@ class SelfNode(nodes.StatusNode):
         services = self.config.get('services', [])
         services = [_ for _ in services if not _.get('uname', '').startswith('//')]
 
-        for node_name, n in self.nodes.items():
-            if n.services:
-                services += [
-                    {
-                        'name': '{}@{}'.format(_['name'], node_name),
-                        'uname': '',
-                        'actions': _.get('actions', []),
-                        'dispname': _.get('dispname', None),
-                    }
-                    for _ in n.load_services()
-                    if not _.get('uname', '').startswith('//')
-                ]
-
         self.serv_procs = dict([(_['proc'] + ':' + _.get('uname', ''), _)
                                 for _ in services if '@' not in _['name']])
 
@@ -186,17 +174,40 @@ class SelfNode(nodes.StatusNode):
             
         return self.services
 
+    def all_services(self):
+        if self.services == 'auto': self.services = self.load_services()
+        services = list(self.services)
+        for node_name, n in self.nodes.items():
+            if n.services:
+                if n.services == 'auto': n.load_services()
+                services += [
+                    {
+                        'node': node_name,
+                        'name': _['name'],
+                        'uname': '',
+                        'actions': _.get('actions', []),
+                        'dispname': _.get('dispname', None),
+                    }
+                    for _ in n.services
+                    if not _.get('uname', '').startswith('//')
+                ]
+        return services
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = cfg.get('secret_key', 'secret!')
+import hashlib
+md5 = lambda x: hashlib.md5(x.encode('utf-8')).hexdigest()
+cfg['encrypted_password'] = '' if 'password' not in cfg else md5(cfg['password'] + md5(app.config['SECRET_KEY']))
+
 
 def client_ip():
     return request.environ.get('HTTP_X_FORWARDED_FOR', request.environ['REMOTE_ADDR']).split(', ')[0]
-    
-    
+
+
 def is_authenticated():
     import fnmatch
-       
+
     if 'granted_ips' in cfg:
         client = client_ip()
         for ips in cfg['granted_ips']:
@@ -204,29 +215,40 @@ def is_authenticated():
                 return True
     
     if 'password' in cfg:
-        return request.cookies.get('auth') == 'FF'
+        return request.cookies.get('auth') == cfg['encrypted_password']
     
     return True
 
 
 def node_call(node_name='self', cmd='get_status', arg=''):
-    if not is_authenticated(): return {'error': 'forbidden'}
+    
+    def filter_password(d):
+        if isinstance(d, dict):
+            if 'password' in d: del d['password']
+            for k in d:
+                d[k] = filter_password(d[k])
+        elif isinstance(d, list):
+            d = [filter_password(_) for _ in d]
+        return d
+        
     n = selfnode.nodes.get(node_name, selfnode)
-    arg = cmd.split('/')[1:] or []
+    arg = [_ for _ in arg.split('/') if _ != ''] or cmd.split('/')[1:] or []
     cmd = cmd.split('/')[0]
     if hasattr(n, cmd):
         try:
             r = getattr(n, cmd)
             if hasattr(r, '__call__'):
                 r = r(*arg)
+                n.refresh_status()
             if isinstance(r, (Response, tuple)):
                 return r
             else:
+                if cmd == 'config':
+                    r = filter_password(dict(r))
                 if cmd == 'node':
                     return r
                 else:
                     return {'node': node_name, 'resp': r}
-            n.refresh_status()
         except Exception as ex:
             return {'error': repr(ex), 'callstack': traceback.format_exc()}
     else:
@@ -236,6 +258,8 @@ def node_call(node_name='self', cmd='get_status', arg=''):
 @app.route('/node/<node_name>/<path:cmd>')
 @app.route('/node/<node_name>')
 def node(node_name='self', cmd='get_status', arg=''):
+    if not is_authenticated(): return {'error': 'forbidden', 'source': client_ip()}
+
     r = node_call(node_name, cmd, arg)    
     if isinstance(r, (Response, tuple)):
         return r
@@ -248,7 +272,7 @@ def node_put_status(node_name):
     n = selfnode.nodes.get(node_name, None)
     if n is None:
         return 'No such node.', 404
-    elif not isinstance(n, nodes.ActiveNode):
+    elif not isinstance(n, nodes.StatusNode):
         return 'Node {} is not an active node.', 400
     n.set_buffer(request.get_json())
     return 'Updated', 201
@@ -262,16 +286,15 @@ def reload():
         
 
 @app.route('/', methods=["GET", "POST"])
-@app.route('/<path:p>')
 def index(p='index.html'):
     if not is_authenticated():
         if 'password' in cfg:
             if request.form.get('pass') == cfg['password']:
                 resp = Response('''<html><script>location.href='./'</script>
                 ''')
-                resp.set_cookie('auth', 'FF', expires=datetime.now()+timedelta(days=90))
+                resp.set_cookie('auth', cfg['encrypted_password'], expires=datetime.now()+timedelta(days=90))
                 return resp
-            elif request.cookies.get('auth') != 'FF':
+            elif request.cookies.get('auth', '') != cfg['encrypted_password']:
                 return Response('''<html><form method="post" action=""><input type="password" name="pass"></form>
                 ''' + client_ip())
     
@@ -286,12 +309,6 @@ def index(p='index.html'):
 
 
 if __name__ == '__main__':
-    if not os.path.exists('bootstrap.min.css'):
-        os.system('wget -c https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js')
-        os.system('wget -c https://stackpath.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js')
-        os.system('wget -c https://stackpath.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css')
-        os.system('wget -c https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js')
-
     selfnode = SelfNode()
     
     if cfg.get('parent'):

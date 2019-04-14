@@ -52,6 +52,10 @@ def apply(vars):
     @socketio.on('request', namespace='/stats')
     def s_node(data):
         socketio.emit('notify', vars['node_call'](data['node_name'], data['cmd'], data['arg']), namespace='/stats')
+        time.sleep(2)
+        socketio.emit('stats',
+                        {'node': data['node_name'], 'resp': selfnode.nodes.get(data['node_name']).get_status()},
+                        namespace='/stats')
     
     @socketio.on('disconnect', namespace='/stats')
     def s_disconnect():
@@ -64,4 +68,3 @@ def apply(vars):
             n.set_buffer(data)
     
     socketio.run(app, host='0.0.0.0', port=10000, debug=True)
-

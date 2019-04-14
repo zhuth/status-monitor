@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- load MUI -->
+    <title>Status Monitor</title>
+    <link href="static/mui.min.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="static/controls.css">
+    <script src="static/mui.min.js"></script>
+    <script src="static/jquery.min.js"></script>
+    <script src="static/socket.io.min.js"></script>
+</head>
+
+<body>
+    <div id="sidedrawer" class="mui--no-user-select">
+        <div id="sidedrawer-brand" class="mui--appbar-line-height">
+            <span class="mui--text-title">Status Monitor</span>
+        </div>
+        <div class="mui-divider"></div>
+        <ul>
+            <li id="u_nodes">
+                <strong>节点</strong>
+                <ul></ul>
+            </li>
+            <li id="u_services">
+                <strong><a href="#services">服务</a></strong>
+            </li>
+            <li id="u_video">
+                <strong>摄像头</strong>
+                <ul>
+                    <li><a href="#video/0">摄像头1</a></li>
+                    <li><a href="#video/1">摄像头2</a></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+    <header id="header">
+        <div class="mui-appbar mui--appbar-line-height">
+            <div class="mui-container-fluid">
+                <a
+                    class="sidedrawer-toggle mui--visible-xs-inline-block mui--visible-sm-inline-block js-show-sidedrawer">☰</a>
+                <a class="sidedrawer-toggle mui--hidden-xs mui--hidden-sm js-hide-sidedrawer">☰</a>
+                <span class="mui--text-title mui--visible-xs-inline-block">Status Monitor</span>
+            </div>
+        </div>
+    </header>
+
+    <div id="content-wrapper">
+        <div id="appbar-placeholder" class="mui--appbar-height"></div>
+        <div class="mui-container-fluid">
+            <div class="mui-row">
+                <div class="mui-col-sm-10 mui-col-sm-offset-1">
+                    <div class="space-top"></div>
+
+                    <h1 id="n_name"></h1>
+
+                    <div class="mui-panel" id="u_main">
+                    </div>
+
+                    <div class="space-bottom"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer id="footer">
+        <div class="mui-container-fluid">
+            <br>
+            Made with <a href="https://www.muicss.com">MUI</a>
+        </div>
+    </footer>
+
+    <template for="node">
+        <ul class="mui-tabs__bar">
+            <li class="mui--is-active"><a data-mui-toggle="tab" data-mui-controls="pane-node-status">状态</a></li>
+            <li><a data-mui-toggle="tab" data-mui-controls="pane-node-services">服务</a></li>
+        </ul>
+
+        <div class="mui-tabs__pane mui--is-active" id="pane-node-status">
+            <p>
+                电源 <button class="mui-btn mui-btn--fab" data-action="toggle_power" id="n_power"></button>
+            </p>
+            <p>
+                负载 <span id="n_uptime"></span> / <span id="n_temp"></span>
+            </p>
+            
+            <button class="mui-btn mui-btn--primary" data-action="reboot">重启</button>
+            <button class="mui-btn mui-btn--danger" data-action="force_off">强制关机</button>
+
+        </div>
+        <div class="mui-tabs__pane" id="pane-node-services">
+            <for array="resp" valvar="value">
+                <h3>{{value.dispname||value.name}}</h3>
+                <button class="mui-btn mui-btn--fab" data-action="toggle_service" data-service="{value.name}" id="n_services_{value.name}"></button>
+            </for>
+        </div>
+    </template>
+    <template for="node/air">
+
+        <h2>状态</h2>
+        <div class="mui-divider"></div>
+        <div>
+            <img src="" alt="" id="n_aqi_icon" class="aqi-icons">
+            <img src="" alt="" id="n_city_aqi" class="aqi-icons">
+            <img src="" alt="" id="n_aqi_pred" class="aqi-icons">
+            <p>
+                <span id="n_temp"></span> / <span id="n_hum"></span>
+            </p>
+        </div>
+
+        <h2>操作</h2>
+        <div class="mui-divider"></div>
+        <div class="mui-tabs__pane mui--is-active" id="pane-node-status">
+            <button data-action="power_on" data-node="air" class="mui-btn button-on">开</button>
+            <button data-action="speed1" data-node="air" class="mui-btn mui-btn--primary">速度1</button>
+            <button data-action="speed2" data-node="air" class="mui-btn mui-btn--primary">速度2</button>
+            <button data-action="power_off" data-node="air" class="mui-btn button-off">关</button>
+            <button data-action="reset" data-node="air" class="mui-btn mui-btn--accent">重置</button>
+        </div>
+    </template>
+    <template for="node/switches">
+        <for array="switch_nodes" valvar="value">
+            <h2>{value.name}</h2>
+            <div class="mui-divider"></div>
+            <button class="mui-btn mui-btn--fab" data-node="{{value.node || 'self'}}" data-action="toggle_power"
+                id="n_{value.node}_power"></button>
+        </for>
+    </template>
+    <template for="services">
+        <for array="resp" valvar="value">
+                <h3>{{value.dispname||value.name}}</h3>
+            <button class="mui-btn mui-btn--fab" data-action="toggle_service" data-node="{{value.node || 'self'}}"
+             data-service="{value.name}" id="n_{{value.node || 'self'}}_{value.name}"></button>
+            <for wrapper="span" dict="value.actions" valvar="action" keyvar="key" if="['start', 'stop', 'restart'].indexOf(key) &lt; 0">
+                <button class="mui-btn" data-action="link" data-href="{action}">{key}</button>
+            </for>
+        </for>
+    </template>
+    <template for="video">
+        <img src="" alt="video">
+    </template>
+
+    <script>
+        var config = {
+            default_node: 'switches',
+            video_provider: '/stream/{node}',
+            nodes: {
+                'air': '空气净化器',
+                'computer': '台式机',
+                'router': '路由器',
+                'self': '树莓派',
+                'printer': '打印机',
+                'lamp': '灯',
+                'tv': '电视',
+                'sony': '文件服务器',
+                'switches': '开关组',
+                'tplink': 'TP-Link'
+            }
+        };
+    </script>
+    <script src="static/controls.js"></script>
+</body>
+
+</html>
