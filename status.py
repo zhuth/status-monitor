@@ -239,7 +239,8 @@ def node_call(node_name='self', cmd='get_status', arg=''):
             r = getattr(n, cmd)
             if hasattr(r, '__call__'):
                 r = r(*arg)
-                n.refresh_status()
+                if cmd != 'get_status':
+                    n.refresh_status()
             if isinstance(r, (Response, tuple)):
                 return r
             else:

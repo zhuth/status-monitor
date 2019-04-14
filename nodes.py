@@ -199,6 +199,8 @@ class AirPurifier(StatusNode):
         m = re.search(r'>(\d+)<', js)
         if m:
             return m.group(1)
+        else:
+            return '-'
         
     def _get_status(self):
         d = self.call_command('?')

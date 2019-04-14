@@ -145,7 +145,13 @@ def icon(aqi):
         color = aqi_colors[aqi_stage-1]
         return (int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16))
     
-    if ':' in aqi:
+    if aqi == '-' or aqi is None:
+        color = (255, 255, 255)
+        im = Image.new('RGB', (64, 64), color)
+        d = ImageDraw.Draw(im)
+        w, h = fnt.getsize('-')
+        d.text(((64-w)/2, 10), '-', font=fnt, fill=(255, 255, 255))
+    elif ':' in aqi:
         im = Image.new('RGB', (64, 64), (0, 0, 0))
         d = ImageDraw.Draw(im)
         aqi1, aqi2 = [int(_) for _ in aqi.split(':')]
