@@ -146,7 +146,7 @@
     <script>
         var config = {
             default_node: 'switches',
-            video_provider: '/stream/{node}',
+            video_provider: '/stream/?action=snapshot_{node}&_t={t}',
             nodes: {
                 'air': '空气净化器',
                 'computer': '台式机',
