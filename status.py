@@ -25,7 +25,7 @@ class SelfNode(nodes.StatusNode):
     Detect system mode
     """
     def __init__(self):
-        nodes.StatusNode.__init__(self, ip='localhost', services='auto')
+        nodes.StatusNode.__init__(self, ip='localhost', services='auto', interval=cfg.get('interval', 0))
         self.serv_procs = {}
         self.nodes = {}
         try:
@@ -64,6 +64,11 @@ class SelfNode(nodes.StatusNode):
     def ping(self):
         return True
 
+    def run(self, cmd, *args):
+        assert cmd in cfg.get('allowed_commands', [])
+        out_bytes = subprocess.check_output([cmd] + list(args), stderr=subprocess.STDOUT)
+        return out_bytes.decode('utf-8')
+
     def _get_status(self):
     
         def meminfo():
@@ -84,8 +89,6 @@ class SelfNode(nodes.StatusNode):
             else:
                 return ''
                 
-        if self.services == 'auto': self.load_services()
-
         status = {}
         
         status['services'] = {}
@@ -162,24 +165,25 @@ class SelfNode(nodes.StatusNode):
         __act(actions, cmd)
         return True
 
-    def load_services(self):
-        services = self.config.get('services', [])
-        services = [_ for _ in services if not _.get('uname', '').startswith('//')]
+    @property
+    def services(self):
+        if self._services == 'auto':
+            services = self.config.get('services', [])
+            services = [_ for _ in services if not _.get('uname', '').startswith('//')]
 
-        self.serv_procs = dict([(_['proc'] + ':' + _.get('uname', ''), _)
-                                for _ in services if '@' not in _['name']])
-
-        self.services = services
-        self.serv_dict = dict([(_['name'], _) for _ in services])
-            
-        return self.services
+            self.serv_procs = dict([(_['proc'] + ':' + _.get('uname', ''), _)
+                                    for _ in services if '@' not in _['name']])
+            self._services = services
+            self.serv_dict = dict([(_['name'], _) for _ in services])
+        
+        return self._services
 
     def all_services(self):
-        if self.services == 'auto': self.services = self.load_services()
+        if self.services == 'auto': self.services = self.services
         services = list(self.services)
         for node_name, n in self.nodes.items():
             if n.services:
-                if n.services == 'auto': n.load_services()
+                if n.services == 'auto': n.services
                 services += [
                     {
                         'node': node_name,
@@ -196,6 +200,7 @@ class SelfNode(nodes.StatusNode):
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = cfg.get('secret_key', 'secret!')
+
 import hashlib
 md5 = lambda x: hashlib.md5(x.encode('utf-8')).hexdigest()
 cfg['encrypted_password'] = '' if 'password' not in cfg else md5(cfg['password'] + md5(app.config['SECRET_KEY']))
@@ -329,7 +334,7 @@ if __name__ == '__main__':
                                 st.emit('push', {
                                     'node': cfg['name'],
                                     'status': selfnode.get_status(),
-                                    'services': selfnode.load_services()
+                                    'services': selfnode.services
                                 })
                                 s.wait(seconds=1)
                                 time.sleep(30)

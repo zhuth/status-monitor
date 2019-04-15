@@ -2,20 +2,30 @@
  * Body CSS
  */
 
-html, body {
+html,
+body {
     height: 100%;
     background-color: #eee;
 }
 
-html, body, input, textarea, button {
+html,
+body,
+input,
+textarea,
+button {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.004);
 }
 
 .pointer {
-	cursor: pointer;
+    cursor: pointer;
 }
+
+textarea {
+    font: monospace;
+}
+
 
 /**
   * Layout CSS
@@ -85,6 +95,7 @@ html, body, input, textarea, button {
     }
 }
 
+
 /**
   * Toggle Side drawer
   */
@@ -92,6 +103,7 @@ html, body, input, textarea, button {
 #sidedrawer.active {
     transform: translate(200px);
 }
+
 
 /**
   * Header CSS
@@ -109,6 +121,7 @@ html, body, input, textarea, button {
     color: #fff;
     text-decoration: none;
 }
+
 
 /**
   * Footer CSS
@@ -161,11 +174,13 @@ html, body, input, textarea, button {
     color: black !important;
 }
 
-#sidedrawer a:hover, #sidedrawer a:focus {
+#sidedrawer a:hover,
+#sidedrawer a:focus {
     text-decoration: none;
 }
 
-#sidedrawer li.active, #sidedrawer li>ul>li:hover {
+#sidedrawer li.active,
+#sidedrawer li>ul>li:hover {
     background-color: #E0E0E0;
 }
 
@@ -228,21 +243,27 @@ input:checked+.slider:before {
     border-radius: 50%;
 }
 
-template, for {
+template,
+for {
     display: none;
 }
 
-.button-on, .button-on:hover, .button-on:focus {
+.button-on,
+.button-on:hover,
+.button-on:focus {
     color: #FFF;
     background-color: green;
 }
 
-.button-off, .button-off:hover, .button-off:focus {
+.button-off,
+.button-off:hover,
+.button-off:focus {
     color: #FFF;
     background-color: red;
 }
 
-.button-on[disabled], .button-off[disabled] {
+.button-on[disabled],
+.button-off[disabled] {
     opacity: 0.1;
 }
 

@@ -5,6 +5,7 @@ import requests, subprocess, json, os, sys, base64, time
 from flask import Response
 import re
 
+
 def _curl(url, timeout=None):
     if timeout is None: timeout = StatusNode.timeout
     try:
@@ -24,24 +25,22 @@ class StatusNode:
     def __init__(self, ip=None, power_ip=None, services=None, interval=0):
         self.ip = ip
         self.power_ip = power_ip
-        self.services = services
         self.interval = interval
+        self._services = services
         self._status_buf = {}
         self.last_update = 0
 
     def detect_power(self):
-        return self.ping()
+        return os.system('/bin/ping -c 1 {} > /dev/null'.format(self.ip)) == 0
+        
+    def jcurl(self, *args):
+        return json.loads(_curl('http://{}:10000/node/self{}'.format(self.ip, ('/' + '/'.join(args)) if len(args) else '')).content.decode('utf-8'))['resp']
 
-    def ping(self):
-        if self.ip:
-            return os.system('/bin/ping -c 1 {} > /dev/null'.format(self.ip)) == 0
-
-    def load_services(self):
-        if self.services == 'auto' and self.ip:
+    @property
+    def services(self):
+        if self._services == 'auto' and self.ip:
             try:
-                self.services = json.loads(_curl('http://{}:10000/node/self/load_services'
-                                                             .format(self.ip))
-                                           .content.decode('utf-8'))['resp']
+                self.services = self.jcurl('services')
             except TimeoutError:
                 pass
             except KeyError:
@@ -49,15 +48,13 @@ class StatusNode:
             except json.decoder.JSONDecodeError:
                 print('Error while loading from {}'.format(self.ip))
                 pass
-        return self.services if isinstance(self.services, list) else []
+        return self._services if isinstance(self._services, list) else []
         
     def _get_status(self):
-        if self.services is not None and self.ip:
-            try:
-                return json.loads(_curl('http://{}:10000/node/self'.format(self.ip))
-                                  .content.decode('utf-8'))['resp']
-            except TimeoutError:
-                pass
+        try:
+            return self.jcurl()
+        except TimeoutError:
+            pass
 
     def get_status(self):
         if time.time() - self.last_update >= self.interval:
@@ -70,14 +67,12 @@ class StatusNode:
 
     def set_buffer(self, request_json, **kwargs):
         self._status_buf = request_json['status'] or {}
-        if not self.services: self.services = request_json.get('services', [])
-        
+        if not isinstance(self._services, list): self._services = request_json.get('services', [])
         self._status_buf['power'] = True
-        
         self.last_update = time.time()
         self._status_buf['last_update'] = self.last_update
     
-    def power(self, cmd):
+    def _power(self, cmd):
         if self.power_ip:
             assert cmd in ['on', 'off', 'uflash', 'flash']
             assert _curl('http://{}/{}'.format(self.power_ip, cmd)).status_code == 200
@@ -85,9 +80,9 @@ class StatusNode:
 
     def force_off(self):
         if self.power_ip:
-            self.power('on')
+            self._power('on')
             time.sleep(10)
-            self.power('off')
+            self._power('off')
             return True
 
     def power_on(self):
@@ -96,27 +91,24 @@ class StatusNode:
             from wakeonlan import send_magic_packet
             send_magic_packet(wolmac, ip_address='.'.join(self.ip.split('.')[:3]+['255']))
             return True
-        elif self.ip and self.power_ip : # computer with wifi power button
+        elif self.ip and self.power_ip: # computer with wifi power button
             return self.power('uflash')
-        else: # power node
-            return self.power('on')
 
     def power_off(self):
         if self.ip:
-            assert _curl('http://{}:10000/node/self/{}'.format(self.ip, 'power_off')).status_code == 200
+            return self.jcurl('power_off')
         else:
             return self.power('off')
 
     def reboot(self):
-        assert _curl('http://{}:10000/node/self/{}'.format(self.ip, 'reboot')).status_code == 200
-        return True
+        return self.jcurl('reboot')
 
     def set_service(self, service_name, cmd):
-        if self.ip and self.services:
-            assert cmd in ['restart', 'reload', 'stop', 'start', 'status']
-            assert _curl('http://{}:10000/node/self/set_service/{}/{}'.
-                                     format(self.ip, service_name, cmd)).status_code == 200
-            return True
+        assert cmd in ['restart', 'reload', 'stop', 'start', 'status']
+        return self.jcurl('set_service', service_name, cmd)
+
+    def run(self, cmd, *args):
+        return self.jcurl('run', cmd, *args)
 
     def node(self, node_name, *other_params):
         op = '/'.join(other_params)
@@ -126,21 +118,25 @@ class StatusNode:
             return json.loads(resp.content.decode('utf-8'))
         else:
             return Response(resp.content, content_type=resp.headers['content-type'])
-            
+        
     def refresh_status(self):
         self.last_update = 0
 
 
 class AirPurifier(StatusNode):
 
-    def __init__(self, socket='/tmp/aqimonitor.socket', city='Beijing'):
-        super().__init__()
+    def __init__(self, socket='/tmp/aqimonitor.socket', city='Beijing', interval=60):
+        super().__init__(interval=interval)
         import aqimonitor
+        self._services = []
         self.socket = socket
         self.aqi_colors = aqimonitor.aqi_colors
         self.icon = aqimonitor.icon
         self.city = city
 
+    def detect_power(self):
+        return True
+        
     def icon_base64(self, aqio):
         if not isinstance(aqio, str): aqio = str(int(aqio))
         aqi_icon = self.icon(aqio)
@@ -177,12 +173,6 @@ class AirPurifier(StatusNode):
             r = r.decode('utf-8')
         return r
 
-    def load_services(self):
-        return []
-        
-    def detect_power(self):
-        return True
-        
     def aqi_icon(self, aqi):
         from aqimonitor import icon as __icon
         return Response(__icon(aqi), content_type='image/png')
@@ -229,9 +219,6 @@ class AirPurifier(StatusNode):
     def speed2(self):
         return self.call_command('2')
         
-    def power(self, onoff):
-        self.call_command('0' if onoff == 'off' else 'x')
-        
     def power_on(self):
         self.power('on')
     
@@ -261,21 +248,15 @@ class SwitchNode(StatusNode):
     def _get_status(self):
         return {}
 
-    def load_services(self):
-        pass
-    
-    def reboot(self):
-        pass
-
     def set_service(self, service_name, cmd):
         pass
         
     def power_off(self):
-        self.power('off')
+        self._power('off')
         return True
     
     def power_on(self):
-        self.power('on')
+        self._power('on')
         return True
 
 
@@ -290,13 +271,7 @@ class KonkeNode(SwitchNode):
 
     def detect_power(self):
         return self._konke.status == 'open'
-
-    def ping(self):
-        return self._konke.status != 'offline'
         
-    def power(self, onoff):
-        return self.power_off() if onoff == 'off' else self.power_on()
-
     def power_off(self):
         self._konke.turn_off()
         return True
@@ -345,10 +320,11 @@ class DelegateNode(StatusNode):
                 pass
         return deal
     
-    def load_services(self):
-        if self.services == "auto":
-            self.services = DelegateNode.resp(self.parent.node(self.name, 'load_services'))
-        return self.services
+    @property
+    def services(self):
+        if self._services == "auto":
+            self._services = DelegateNode.resp(self.parent.node(self.name, 'services'))
+        return self._services
 
 
 class TpLinkRouterNode(StatusNode):
@@ -358,7 +334,7 @@ class TpLinkRouterNode(StatusNode):
         from tplink_api.tplink import TpLinkRouter
         self.router = TpLinkRouter(ip)
         self.password = password
-        self.services = [
+        self._services = [
             {'name': 'wlan2g', 'dispname': '2.4GHz'},
             {'name': 'wlan5g', 'dispname': '5GHz'},
         ]
