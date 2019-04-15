@@ -118,7 +118,7 @@
     <section v-if="current[0] === 'services'">
         <div v-for="value in services">
 			<h3>{{value.dispname||value.name}}</h3>
-            <button-toggler v-if="resp[value.node]" :val="resp[value.node].services[value.name]" :node="value.node" action="toggle_service" :data-service="value.name"></button-toggler>
+            <button-toggler v-if="resp[value.node||'self']" :val="resp[value.node||'self'].services[value.name]" :node="value.node" action="toggle_service" :data-service="value.name"></button-toggler>
 			<button v-for="action, key in value.actions" v-if="['start', 'stop', 'restart'].indexOf(key) &lt; 0"
 			class="mui-btn" data-action="link" :data-href="action">{{key}}</button>
         </div>

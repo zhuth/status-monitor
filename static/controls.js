@@ -17,7 +17,7 @@ jQuery(function ($) {
         $sidedrawer = $('#sidedrawer');
 		
     $.get('node/self').done((data) => {
-        data.resp.nodes.self = 'StatusNode';
+        app.nodes.push('self');
         for (let node in data.resp.nodes) {
             if (['SwitchNode', 'KonkeNode'].indexOf(data.resp.nodes[node]) >= 0) {
                 app.switch_nodes.push(node);
@@ -42,7 +42,7 @@ jQuery(function ($) {
 			
 			for (let n of nodes) {
 				$.get('node/' + n).done((data) => {
-					app.resp[data.node] = data.resp;
+					app.resp[n] = data.resp;
 					app.$forceUpdate();
 				});
 			}
