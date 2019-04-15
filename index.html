@@ -21,25 +21,23 @@
             </div>
             <div class="mui-divider"></div>
             <ul>
-                <li id="u_nodes">
+                <li>
                     <strong>节点</strong>
                     <ul>
                         <li class="pointer" v-for="node in nodes" @click="navigate('node/' + node)" :class="{active: current[0] == 'node' &&
                                 current[1] == node}">{{ config.node_names[node] || node }}</li>
                     </ul>
                 </li>
-                <li id="u_services" data-href="#services" :class="{active:
+                <li :class="{active:
+                        current[0] == 'switches'}">
+                    <strong @click="navigate('switches')">开关组</strong>
+                </li>
+                <li :class="{active:
                         current[0] == 'services'}">
                     <strong @click="navigate('services')">服务</strong>
                 </li>
-                <li id="u_video">
-                    <strong>摄像头</strong>
-                    <ul>
-                        <li class="pointer" v-for="channel in
-                                config.video_channels" @click="navigate('video/'
-                                + channel)" :class="{active: current[0] ==
-                                'video' && current[1] == channel}">摄像头 {{ channel }}</li>
-                    </ul>
+                <li>
+                    <strong @click="navigate('cameras')">摄像头</strong>
                 </li>
             </ul>
         </div>
@@ -63,19 +61,15 @@
                 <div class="mui-row">
                     <div class="mui-col-sm-10 mui-col-sm-offset-1">
                         <div class="space-top"></div>
-
-                        <h1 id="n_name">{{ config.node_names[current[1]] || (config.node_names[current[0]] + (current[1] || '')) }}</h1>
-
+                        <p>&nbsp;</p>
                         <div class="mui-panel" id="u_main">
-
-                            <section v-if="current[0] === 'node' && current[1] !== 'switches'">
-
+                            <section v-if="current[0] === 'node'">
                                 <div v-if="resp[current[1]]">
+                                    <h1 id="n_name">{{ config.node_names[current[1]] || (config.node_names[current[0]] + (current[1] || '')) }}
+                                        <button-toggler :node="current[1]" action="power" :val="resp[current[1]]['power']"></button-toggler>
+                                    </h1>
+                                    <div class="mui-divider"></div>
                                     <div v-if="current[1] !== 'air'">
-                                        <p>
-                                            电源
-                                            <button-toggler v-if="resp[current[1]]" action="toggle_power" :data-node="current[1]" :val="resp[current[1]]['power']"></button-toggler>
-                                        </p>
                                         <div v-show="resp[current[1]].power">
                                             <p>
                                                 负载 <span id="n_uptime">{{
@@ -83,18 +77,16 @@
                                                 <temperature-viewer :val="resp[current[1]].temp"></temperature-viewer>
                                             </p>
                                             <div>
-                                                <button class="mui-btn mui-btn--primary" data-action="reboot">重启</button>
-                                                <button class="mui-btn mui-btn--danger" data-action="force_off">强制关机</button>
-                                                <button data-action="run/df" class="mui-btn">df</button>
-                                                <button data-action="run/ps/aux" class="mui-btn">ps</button>
+                                                <button class="mui-btn mui-btn--primary" @click="action_button(current[1], 'reboot')">重启</button>
+                                                <button class="mui-btn mui-btn--danger"  @click="action_button(current[1], 'force_off')">强制关机</button>
+                                                <button v-for="shortcut in ['df', 'ps', 'top/-b/-n1']" @click="action_button(current[1], 'run/' + shortcut)" class="mui-btn">{{ shortcut.split('/')[0] }}</button>
                                                 <br>
-                                                <textarea name="n_output" id="n_output" :value="output" cols="50" rows="10" disabled></textarea>
+                                                <textarea v-show="output" :value="output" rows="10" disabled></textarea>
                                             </div>
                                         </div>
                                     </div>
                                     <div v-else>
                                         <h2>状态</h2>
-                                        <div class="mui-divider"></div>
                                         <p v-if="resp.air">
                                             <img :src="resp.air.aqi_icon" alt="" id="n_aqi_icon" class="aqi-icons">
                                             <img :src="resp.air.city_aqi" alt="" id="n_city_aqi" class="aqi-icons">
@@ -107,43 +99,44 @@
                                         </p>
 
                                         <h2>操作</h2>
-                                        <div class="mui-divider"></div>
                                         <div>
-                                            <button data-action="power_on" data-node="air" class="mui-btn
-                                                    button-on">开</button>
-                                            <button data-action="speed1" data-node="air" class="mui-btn
-                                                    mui-btn--primary">速度1</button>
-                                            <button data-action="speed2" data-node="air" class="mui-btn
-                                                    mui-btn--primary">速度2</button>
+                                            <button @click="action_buton('air', 'power_on')" class="mui-btn button-on">开</button>
+                                            <button @click="action_buton('air', 'speed1')" class="mui-btn mui-btn--primary">速度1</button>
+                                            <button @click="action_buton('air', 'speed2')" class="mui-btn mui-btn--primary">速度2</button>
                                         </div>
                                         <div>
-                                            <button data-action="power_off" data-node="air" class="mui-btn
-                                                    button-off">关</button>
-                                            <button data-action="reset" data-node="air" class="mui-btn
-                                                    mui-btn--accent">重置</button>
+                                            <button @click="action_buton('air', 'power_off')" class="mui-btn button-off">关</button>
+                                            <button @click="action_buton('air', 'reset')" class="mui-btn mui-btn--accent">重置</button>
                                         </div>
                                     </div>
                                 </div>
                             </section>
 
-                            <section v-else-if="current[0] === 'node' && current[1] === 'switches'">
+                            <section v-else-if="current[0] === 'switches'">
                                 <div v-for="n in switch_nodes">
-                                    <h2>{{ config.node_names[n] || n }}</h2>
-                                    <div class="mui-divider"></div>
-                                    <button-toggler v-if="resp[n]" action="toggle_power" :data-node="n" :val="resp[n]['power']"></button-toggler>
+                                    <h2>
+                                    <button-toggler v-if="resp[n]" :node="n" action="power"
+										:val="resp[n]['power']"></button-toggler>
+									{{ config.node_names[n] || n }}
+                                    </h2>
                                 </div>
                             </section>
 
                             <section v-else-if="current[0] === 'services'">
                                 <div v-for="value in services">
-                                    <h3>{{value.dispname||value.name}}</h3>
-                                    <button-toggler v-if="resp[value.node||'self']" :val="resp[value.node||'self'].services[value.name]" :node="value.node" action="toggle_service" :data-service="value.name"></button-toggler>
-                                    <button v-for="action, key in value.actions" v-if="['start', 'stop', 'restart'].indexOf(key) &lt; 0" class="mui-btn" data-action="link" :data-href="action">{{key}}</button>
+                                    <h2>
+                                    <button-toggler v-if="resp[value.node||'self']" :val="resp[value.node||'self'].services[value.name]" 
+										:node="value.node" :action="'service/' + value.name">
+									</button-toggler>
+                                    {{value.dispname||value.name}}
+									<button v-for="action, key in value.actions" v-if="['start', 'stop', 'restart'].indexOf(key) &lt; 0" 
+											class="mui-btn" @click="action_button(null, 'link', {'link': action})">{{key}}</button>
+									</h2>
                                 </div>
                             </section>
 
-                            <section v-else-if="current[0] === 'video'">
-                                <img :src="config.video_provider.replace('{channel}', current[1]).replace('{t}', Math.random())" alt="video">
+                            <section v-else-if="current[0] === 'cameras'">
+                                <img v-for="channel in config.video_channels" :src="config.video_provider.replace('{channel}', channel).replace('{t}', _t)" :data-channel="channel" alt="video">
                             </section>
 
                             <div class="space-bottom"></div>

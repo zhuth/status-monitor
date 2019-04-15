@@ -58,11 +58,13 @@ class StatusNode:
 
     def get_status(self):
         if time.time() - self.last_update >= self.interval:
-            if not self.detect_power():
+            power = self.detect_power()
+            if power or power is None:
+                self.set_buffer({'status': self._get_status()})
+                self._status_buf['power'] = power
+            else:
                 self._status_buf = {'power': False, 'last_update': time.time()}
                 self.last_update = 0
-            else:
-                self.set_buffer({'status': self._get_status()})
         return self._status_buf
 
     def set_buffer(self, request_json, **kwargs):
@@ -92,13 +94,13 @@ class StatusNode:
             send_magic_packet(wolmac, ip_address='.'.join(self.ip.split('.')[:3]+['255']))
             return True
         elif self.ip and self.power_ip: # computer with wifi power button
-            return self.power('uflash')
+            return self._power('uflash')
 
     def power_off(self):
         if self.ip:
             return self.jcurl('power_off')
         else:
-            return self.power('off')
+            return self._power('off')
 
     def reboot(self):
         return self.jcurl('reboot')
@@ -135,7 +137,7 @@ class AirPurifier(StatusNode):
         self.city = city
 
     def detect_power(self):
-        return True
+        return None
         
     def icon_base64(self, aqio):
         if not isinstance(aqio, str): aqio = str(int(aqio))
@@ -218,13 +220,13 @@ class AirPurifier(StatusNode):
 
     def speed2(self):
         return self.call_command('2')
-        
+
     def power_on(self):
-        self.power('on')
-    
+        return self.call_command('x')
+
     def power_off(self):
-        self.power('off')
-        
+        return self.call_command('0')
+
     def bgon(self):
         return self.call_command(':')
 
