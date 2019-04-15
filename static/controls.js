@@ -48,7 +48,6 @@
             nodes: [],
             switch_nodes: [],
             services: [],
-            videos: [],
             resp: {},
             services: [],
             current: [''],
@@ -87,7 +86,7 @@
 				}
 			},
 			update () {
-				if (this.current[0] === 'video') {
+				if (this.current[0] === 'cameras') {
 					this._t = Math.random();
 				} else {
 					var nodes = this.nodes;
@@ -100,8 +99,8 @@
 							this.$forceUpdate();
 						});
 					}
-					this.$forceUpdate();
 				}
+				this.$forceUpdate();
 			}
         }
     });

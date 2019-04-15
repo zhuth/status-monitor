@@ -14,6 +14,6 @@ var config = {
         'switches': '开关组',
         'tplink': 'TP-Link',
         'services': '服务',
-        'video': '摄像头'
+        'cameras': '摄像头'
     },
 };

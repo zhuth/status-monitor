@@ -95,7 +95,12 @@ class SelfNode(nodes.StatusNode):
         if self.services:
             for _ in self.services:
                 if '@' not in _['name']:
-                    status['services'][_['name']] = False
+                    status['services'][_['name']] = {
+                        'status': False,
+                        'dispname': _.get('dispname', _['name']),
+                        'name': _['name'],
+                        'actions': _.get('actions', [])
+                    }
         
             for _ in psutil.process_iter():
                 short_key = _.name() + ':'
@@ -112,7 +117,7 @@ class SelfNode(nodes.StatusNode):
                 if s.get('args') and s['args'] not in _.cmdline():
                     continue
 
-                status['services'][s['name']] = True
+                status['services'][s['name']]['status'] = True
                 
         if self.nodes:
             status['nodes'] = {}
@@ -136,10 +141,15 @@ class SelfNode(nodes.StatusNode):
             except Exception as ex:
                 vars['message'] = 'err: ' + str(ex)
                 pass
-            return vars['message']
-            
-        os.system('shutdown now')
-        return True
+            message = vars['message']
+            if message and message.startswith('err'):
+                return {'error': message[4:]}
+        
+        if self.power_ip:
+            os.system('shutdown now')
+            return True
+        
+        return {'error': 'No power-up method, shutting down is forbidden.'}
     
     def reboot(self):
         os.system('reboot')
@@ -177,27 +187,7 @@ class SelfNode(nodes.StatusNode):
             self.serv_dict = dict([(_['name'], _) for _ in services])
         
         return self._services
-
-    def all_services(self):
-        if self.services == 'auto': self.services = self.services
-        services = list(self.services)
-        for node_name, n in self.nodes.items():
-            if n.services:
-                if n.services == 'auto': n.services
-                services += [
-                    {
-                        'node': node_name,
-                        'name': _['name'],
-                        'uname': '',
-                        'actions': _.get('actions', []),
-                        'dispname': _.get('dispname', None),
-                    }
-                    for _ in n.services
-                    if not _.get('uname', '').startswith('//')
-                ]
-        return services
-
-
+    
 app = Flask(__name__)
 app.config['SECRET_KEY'] = cfg.get('secret_key', 'secret!')
 
