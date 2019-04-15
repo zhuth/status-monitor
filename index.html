@@ -70,7 +70,7 @@
 				:val="resp[current[1]]['power']"></button-toggler>
             </p>
             <p>
-                负载 <span id="n_uptime">{{ resp[current[1]].uptime }}</span> / <span id="n_temp">{{ resp[current[1]].temp }}</span>
+                负载 <span id="n_uptime">{{ resp[current[1]].uptime }}</span> / <span id="n_temp">{{ resp[current[1]].temp.replace(/([\d\.]+)d/g, '$1&deg;C') }}</span>
             </p>
             <div>
 	            <button class="mui-btn mui-btn--primary" data-action="reboot">重启</button>
@@ -91,7 +91,7 @@
             <img :src="resp.air.city_aqi" alt="" id="n_city_aqi" class="aqi-icons">
             <img :src="resp.air.aqi_pred" alt="" id="n_aqi_pred" class="aqi-icons">
             <p>
-                <span id="n_temp">{{ (resp.air.temp || '').replace(/(\d+)d/g, '$1&deg;C') }}</span> /
+                <span id="n_temp">{{ (resp.air.temp || '').replace(/([\d\.]+)d/g, '$1&deg;C') }}</span> /
 				<span id="n_hum">{{ resp.air.hum }}</span>
             </p>
         </div>
