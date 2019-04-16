@@ -29,8 +29,17 @@ class StatusNode:
     """
     timeout = 1
 
-    def __init__(self, ip=None, power_ip=None, services=None, interval=0):
-        self.ip = ip
+    def __init__(self, ip=None, power_ip=None, services=None, interval=0, url=None, port=10000):
+        if url:
+            self.base_url = url + 'node/self'
+            self.ip = url.split('://',1)[1].split('/')[0]
+            if ':' in self.ip:
+                self.ip, self.port = self.url.rsplit(':', 1)
+                self.port = int(self.port)
+        else:
+            self.ip = ip
+            self.port = port
+            self.base_url = 'http://{}:{}/node/self'.format(self.ip, self.port)
         self.power_ip = power_ip
         self.interval = interval
         self._services = services
@@ -41,7 +50,9 @@ class StatusNode:
         return os.system('/bin/ping -c 1 {} > /dev/null'.format(self.ip)) == 0
 
     def jcurl(self, *args):
-        return json.loads(_curl('http://{}:10000/node/self{}'.format(self.ip, ('/' + '/'.join(args)) if len(args) else '')).content.decode('utf-8'))['resp']
+        j = json.loads(_curl('{}{}'.format(self.base_url, ('/' + '/'.join(args)) if len(args) else ''),).content.decode('utf-8'))
+        if 'resp' in j: return j['resp']
+        else: return j
 
     @property
     def services(self):
@@ -68,17 +79,15 @@ class StatusNode:
             power = self.detect_power()
             if power or power is None:
                 self.set_buffer({'status': self._get_status()})
-                self._status_buf['power'] = power
             else:
-                self._status_buf = {'power': False, 'last_update': time.time()}
-                self.last_update = 0
+                self.set_buffer({'status': {'power': power}})
         return self._status_buf
 
     def set_buffer(self, request_json, **kwargs):
         self._status_buf = request_json['status'] or {}
         if not isinstance(self._services, list):
             self._services = request_json.get('services', [])
-        self._status_buf['power'] = True
+        if 'power' not in self._status_buf: self._status_buf['power'] = True
         self.last_update = time.time()
         self._status_buf['last_update'] = self.last_update
 
@@ -126,7 +135,7 @@ class StatusNode:
         op = '/'.join(other_params)
         if op:
             op = '/' + op
-        resp = _curl('http://{}:10000/node/{}{}'.format(self.ip,
+        resp = _curl('http://{}:{}/node/{}{}'.format(self.ip, self.port,
                                                         node_name, op), timeout=2)
         if resp.headers['content-type'] == 'application/json':
             return json.loads(resp.content.decode('utf-8'))
@@ -217,6 +226,7 @@ class AirPurifier(StatusNode):
         d['aqi_pred'] = self.icon_base64('{}:{}'.format(
             int(pred['first_half']*30), int(pred['second_half']*30)))
         d['city_aqi'] = self.icon_base64(self.city_aqi())
+        d['power'] = None
         return d
 
     def show(self, text):
@@ -258,7 +268,7 @@ class SwitchNode(StatusNode):
     """
 
     def __init__(self, power_ip):
-        super().__init__(self, power_ip=power_ip, services=None)
+        super().__init__(self, power_ip=power_ip, services=[])
 
     def detect_power(self):
         try:
@@ -267,7 +277,7 @@ class SwitchNode(StatusNode):
             pass
 
     def _get_status(self):
-        return {}
+        return {'power': self.detect_power()}
 
     def set_service(self, service_name, cmd):
         pass

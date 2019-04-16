@@ -62,7 +62,7 @@
                         <div class="mui-panel" id="u_main">
                             <section v-if="current[0] === 'node'">
                                 <div v-if="resp[current[1]]">
-                                    <h1 id="n_name">{{ config.node_names[current[1]] || (config.node_names[current[0]] + (current[1] || '')) }}
+                                    <h1 id="n_name">{{ config.node_names[current[1]] || ((config.node_names[current[0]] || '') + (current[1] || '')) }}
                                         <button-toggler :node="current[1]" action="power" :val="resp[current[1]]['power']"></button-toggler>
                                     </h1>
                                     <div v-if="current[1] !== 'air'">

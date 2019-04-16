@@ -67,4 +67,4 @@ def apply(vars):
         if n and hasattr(n, 'set_buffer'):
             n.set_buffer(data)
     
-    socketio.run(app, host='0.0.0.0', port=10000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=cfg.get('port', 10000), debug=True)

@@ -144,12 +144,14 @@ class SelfNode(nodes.StatusNode):
             message = vars['message']
             if message and message.startswith('err'):
                 return {'error': message[4:]}
+            else:
+                return {'message': message}
         
         if self.power_ip:
             os.system('shutdown now')
             return True
-        
-        return {'error': 'No power-up method, shutting down is forbidden.'}
+        else:
+            return {'error': 'No power-up method, shutting down is forbidden.'}
     
     def reboot(self):
         os.system('reboot')
@@ -243,6 +245,8 @@ def node_call(node_name='self', cmd='get_status', arg=''):
                     r = filter_password(dict(r))
                 if cmd == 'node':
                     return r
+                elif isinstance(r, dict) and 'error' in r:
+                    return r
                 else:
                     return {'node': node_name, 'resp': r}
         except Exception as ex:
@@ -311,11 +315,12 @@ if __name__ == '__main__':
         from threading import Thread
         from socketIO_client import SocketIO as SIOClient, LoggingNamespace
         parent = cfg['parent']
-        
+        if ':' in parent: parent, parent_port = parent.split(':')
+        else: parent_port = 10000
         class ActiveNodeThread(Thread):            
             def run(self):
                 while True:
-                    s = SIOClient(parent, 10000)
+                    s = SIOClient(parent, int(parent_port))
                     st = s.define(LoggingNamespace, '/nodes')
                     with s:
                         while True:
@@ -342,4 +347,4 @@ if __name__ == '__main__':
         ws.apply(vars)
     else:
         print('Web Socket disabled')
-        app.run(host='0.0.0.0', port=10000, debug=True)
+        app.run(host='0.0.0.0', port=cfg.get('port', 10000), debug=True)

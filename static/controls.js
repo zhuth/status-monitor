@@ -46,7 +46,7 @@
         el: '#app',
         data: {
             config: config,
-            nodes: [],
+            nodes: ['self'],
             switch_nodes: [],
             resp: {},
             current: [''],
@@ -74,7 +74,7 @@
                         })
                         .then(() => {
                             this.disabled = false;
-                            update();
+                            this.update();
                         });
                 }
             },
