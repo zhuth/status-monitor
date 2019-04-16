@@ -86,12 +86,15 @@
                                                 </div>
                                             </div>
                                             <div class="mui-tabs__pane" id="pane-node-services">
-                                                <h2 v-for="service, service_name in resp[current[1]].services">
+                                                <div v-for="service, service_name in resp[current[1]].services">
                                                     <button-toggler :val="service.status" :node="current[1]" :action="'service/' + service.name">
                                                     </button-toggler>
-                                                    {{ service.dispname || service.name }}
-                                                    <button class="mui-btn" v-for="val, key in service.actions" @click="action_buton(current[1], 'link', {'link': val})">{{ key }}</button>
-                                                </h2>
+                                                    <h3>
+                                                        {{ service.dispname || service.name }}
+                                                    </h3>
+                                                    <button class="mui-btn" @click="action_button(current[1], 'set_service/' + service.name + '/restart')">重启</button>
+                                                    <a class="mui-btn" v-for="val, key in service.actions" v-if="['start', 'stop', 'restart'].indexOf(key) == -1" :href="val" target="_blank">{{ key }}</a>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -124,10 +127,10 @@
 
                             <section v-else-if="current[0] === 'switches'">
                                 <div v-for="n in switch_nodes">
-                                    <h2>
-                                        <button-toggler v-if="resp[n]" :node="n" action="power" :val="resp[n]['power']"></button-toggler>
+                                    <button-toggler v-if="resp[n]" :node="n" action="power" :val="resp[n]['power']"></button-toggler>
+                                    <h3>
                                         {{ config.node_names[n] || n }}
-                                    </h2>
+                                    </h3>
                                 </div>
                             </section>
 
