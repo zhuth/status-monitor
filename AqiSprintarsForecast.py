@@ -1,9 +1,8 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python
 
 from PIL import Image
 import os
 import requests
-from io import BytesIO
 
 colors = [(int(_[:2], 16), int(_[2:4], 16), int(_[4:], 16)) for _ in ('1e3cff', '00a0ff', '00dc00', 'a0e632', 'e6dc32', 'f08228', 'fa3c3c', 'f00082')]
 
@@ -101,20 +100,3 @@ def predict(hrs, city='default', span=24, avg='average'):
         'average': lambda d: sum(d)/len(d),
         'max': max
     }[avg](data)
-        
-        
-def main():
-    import sys
-    if len(sys.argv) > 1:
-        if sys.argv[1] == 'fetch':
-            for _ in os.listdir('/tmp/'):
-                if _.startswith('pm25_'): os.unlink('/tmp/' + _)
-            fetch_pictures(48)
-        else:
-            print(predict(0, city=sys.argv[1]))
-    else:
-        print(predict(0))
-        
-        
-if __name__ == '__main__':
-    main()

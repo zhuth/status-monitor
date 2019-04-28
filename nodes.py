@@ -129,11 +129,8 @@ class AirPurifier(StatusNode):
 
     def __init__(self, socket='/tmp/aqimonitor.socket', city='Beijing', interval=60):
         super().__init__(interval=interval)
-        import aqimonitor
         self._services = []
         self.socket = socket
-        self.aqi_colors = aqimonitor.aqi_colors
-        self.icon = aqimonitor.icon
         self.city = city
 
     def detect_power(self):
@@ -171,19 +168,22 @@ class AirPurifier(StatusNode):
                 r['aqi_icon'] = self.icon_base64(r['aqi'])
                 r['temp'] = str(int(r['temp'])) + 'd'
                 r['hum'] = str(int(r['hum'])) + '%'
+            return r
+        elif cmd.startswith('icon'):
+            return r
         else:
-            r = r.decode('utf-8')
-        return r
+            return r.decode('utf-8')
 
+    def icon(self, aqistr):
+        return self.call_command('icon{}.'.format(aqistr))
+        
     def aqi_icon(self, aqi):
-        from aqimonitor import icon as __icon
-        return Response(__icon(aqi), content_type='image/png')
+        return Response(self.icon(aqi), content_type='image/png')
 
     def aqi_pred(self):
-        from AqiSprintarsForecast import predict
         return {
-            'first_half': predict(0, span=12),
-            'second_half': predict(12, span=12)
+            'first_half': float(self.call_command('pred0,12')),
+            'second_half': float(self.call_command('pred12,12'))
         }
 
     def city_aqi(self):
@@ -275,12 +275,10 @@ class KonkeNode(SwitchNode):
         return self._konke.status == 'open'
         
     def power_off(self):
-        self._konke.turn_off()
-        return True
+        return self._konke.turn_off()
     
     def power_on(self):
-        self._konke.turn_on()
-        return True
+        return self._konke.turn_on()
 
 
 class DelegateNode(StatusNode):

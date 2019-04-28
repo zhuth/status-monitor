@@ -46,8 +46,11 @@ class SelfNode(nodes.StatusNode):
         for n in self.config.get('nodes', []):
             n = dict(n)
             name = n['name']
-            cls = nodes.__dict__.get(n.get('type'), nodes.StatusNode)
-            if cls is nodes.DelegateNode:
+            cls = nodes.__dict__.get(n.get('type', 'StatusNode'))
+            if cls is None:
+                print('No such type', n['type'])
+                continue
+            elif cls is nodes.DelegateNode:
                 if 'parent' not in n: continue
                 del n['type']
                 n['parent'] = self.nodes[n['parent']]
