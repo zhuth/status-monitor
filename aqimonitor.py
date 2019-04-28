@@ -1,18 +1,23 @@
 #!/usr/bin/env python
+from __future__ import unicode_literals, print_function
 import serial, sys, os, socket
 import threading, json
 import time, sqlite3
 from PIL import Image, ImageFont, ImageDraw
 from io import BytesIO
 import os
-
+import AqiSprintarsForecast
 
 aqi_colors = ['009966', 'ffde33', 'ff9933', 'cc0033', '660099', '730023']
 
 if not os.path.exists('FreeSansBold.ttf'):
     os.system('curl -L https://github.com/opensourcedesign/fonts/raw/master/gnu-freefont_freesans/FreeSansBold.ttf > FreeSansBold.ttf')
 fnt = ImageFont.truetype('FreeSansBold.ttf', 35)
-os.chdir(os.path.dirname(__file__))
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+
+def aqi_pred(i, span):
+    return '{}'.format(AqiSprintarsForecast.predict(i, span=span)).encode('ascii')
 
     
 def aqi(pm25at, pm10at):
@@ -99,6 +104,8 @@ def tcplistener(aport):
                         
                         try:
                             b = b[2:]
+                            if isinstance(b, str):
+                                b = [ord(_) for _ in b]
                             details['pm1_at']  = mergeBytes(b[10], b[11])
                             details['pm25_at'] = mergeBytes(b[12], b[13])
                             details['pm10_at'] = mergeBytes(b[14], b[15])
@@ -119,6 +126,8 @@ def tcplistener(aport):
                         ser.flushOutput()
                     elif data.startswith(b'icon'):
                         conn.send(icon(data[4:data.rfind(b'.')].decode('utf-8')))
+                    elif data.startswith(b'pred'):
+                        conn.send(aqi_pred(*[int(_) for _ in data[4:].split(',')]))
                     else:
                         ser.write(data + b'\n')
                         ser.flushOutput()

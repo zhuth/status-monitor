@@ -5,9 +5,9 @@
     node_names: {
         'air': '空气净化器',
         'computer': '台式机',
-        'router': '路由器',
-        'self': '树莓派',
+        'self': '路由器',
         'printer': '打印机',
+        'pi': '树莓派',
         'lamp': '灯',
         'tv': '电视',
         'nas': '文件服务器',
