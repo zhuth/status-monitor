@@ -1,9 +1,23 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+# load config and set up async mode
+
+import yaml
+import os
+cfg = {}
+if os.path.exists('config.yaml'):
+    cfg = yaml.safe_load(open('config.yaml', encoding='utf-8'))
+
+if 'async_mode' not in cfg: cfg['async_mode'] = 'gevent'
+a = __import__(cfg['async_mode'])
+a.monkey_patch()
+
+# normal imports
+
 from flask import Flask, Response, jsonify, request, redirect
 
-import os, psutil, json, time, base64, sys, re, yaml
+import psutil, json, time, base64, sys, re
 from datetime import datetime, timedelta
 import requests
 import subprocess
@@ -11,10 +25,6 @@ import traceback
 
 path = os.path.dirname(__file__) or '.'
 os.chdir(path)
-
-cfg = {}
-if os.path.exists('config.yaml'):
-    cfg = yaml.load(open('config.yaml', encoding='utf-8'))
 
 import nodes
 nodes.StatusNode.timeout = cfg.get('timeout', 1)
@@ -146,12 +156,9 @@ class SelfNode(nodes.StatusNode):
                 return {'error': message[4:]}
             else:
                 return {'message': message}
-        
-        if self.power_ip:
+        else:
             os.system('shutdown now')
             return True
-        else:
-            return {'error': 'No power-up method, shutting down is forbidden.'}
     
     def reboot(self):
         os.system('reboot')

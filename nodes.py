@@ -30,12 +30,15 @@ class StatusNode:
     timeout = 1
 
     def __init__(self, ip=None, power_ip=None, services=None, interval=0, url=None, port=10000):
+        self.url = url
         if url:
             self.base_url = url + 'node/self'
-            self.ip = url.split('://',1)[1].split('/')[0]
+            self.ip = url.split('://', 1)[1].split('/')[0]
             if ':' in self.ip:
-                self.ip, self.port = self.url.rsplit(':', 1)
+                self.ip, self.port = url.rsplit(':', 1)
                 self.port = int(self.port)
+            else:
+                self.port = 80
         else:
             self.ip = ip
             self.port = port
@@ -47,6 +50,8 @@ class StatusNode:
         self.last_update = 0
 
     def detect_power(self):
+        if self.url:
+            return None
         return os.system('/bin/ping -c 1 {} > /dev/null'.format(self.ip)) == 0
 
     def jcurl(self, *args):
@@ -116,6 +121,8 @@ class StatusNode:
             return self._power('uflash')
 
     def power_off(self):
+        if not self.power_ip:
+            return {'error': 'No power-up method, power-off forbidden.'}
         if self.ip:
             return self.jcurl('power_off')
         else:
@@ -135,8 +142,7 @@ class StatusNode:
         op = '/'.join(other_params)
         if op:
             op = '/' + op
-        resp = _curl('http://{}:{}/node/{}{}'.format(self.ip, self.port,
-                                                        node_name, op), timeout=2)
+        resp = _curl(self.base_url[:-4] + '{}{}'.format(node_name, op), timeout=2)
         if resp.headers['content-type'] == 'application/json':
             return json.loads(resp.content.decode('utf-8'))
         else:

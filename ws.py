@@ -30,11 +30,7 @@ class QueryThread(Thread):
 def apply(vars):
     cfg, app, selfnode = vars['cfg'], vars['app'], vars['selfnode']
     global socketio, thread
-    if cfg.get('async_mode', 'gevent') == 'eventlet':
-        import eventlet
-        eventlet.monkey_patch()
-    
-    socketio = SocketIO(app, async_mode=cfg.get('async_mode', 'gevent'))
+    socketio = SocketIO(app, async_mode=cfg['async_mode'])
     
     @socketio.on('pull', namespace='/stats')
     @socketio.on('connect', namespace='/stats')

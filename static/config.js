@@ -1,4 +1,4 @@
-var config = {
+﻿var config = {
     default_hash: 'switches',
     video_provider: '/stream/?action=snapshot_{channel}&_t={t}',
     video_channels: ['0', '1'],
@@ -10,7 +10,8 @@ var config = {
         'printer': '打印机',
         'lamp': '灯',
         'tv': '电视',
-        'sony': '文件服务器',
+        'nas': '文件服务器',
+        'vultr': 'Vultr',
         'switches': '开关组',
         'tplink': 'TP-Link',
         'services': '服务',
