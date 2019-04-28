@@ -1,5 +1,5 @@
 var config = {
-    default_node: 'self',
+    default_hash: 'switches',
     video_provider: '/stream/?action=snapshot_{channel}&_t={t}',
     video_channels: ['0', '1'],
     node_names: {
