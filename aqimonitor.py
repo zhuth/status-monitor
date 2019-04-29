@@ -80,7 +80,6 @@ def tcplistener(aport):
                 continue
             port = '/dev/' + ports[0]
         try:
-            print(port)
             with serial.Serial(port, 9600, timeout=10) as ser:
                 time.sleep(1)
                 ser.write(b' -')
@@ -137,7 +136,6 @@ def tcplistener(aport):
             skt.close()
             break
         except Exception as ex:
-            print(ex)
             time.sleep(1)
 
 

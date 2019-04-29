@@ -58,7 +58,10 @@ class SelfNode(nodes.StatusNode):
             else:
                 if 'type' in n: del n['type']
                 del n['name']
-                n = cls(**n)
+                try:
+                    n = cls(**n)
+                except TypeError as te:
+                    raise te
             self.nodes[name] = n
 
     def detect_power(self):

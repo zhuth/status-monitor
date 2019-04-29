@@ -87,13 +87,15 @@
                                             </div>
                                             <div class="mui-tabs__pane" id="pane-node-services">
                                                 <div v-for="service, service_name in resp[current[1]].services">
-                                                    <button-toggler :val="service.status" :node="current[1]" :action="'service/' + service.name">
+                                                    <div>
+													<button-toggler :val="service.status" :node="current[1]" :action="'service/' + service.name">
                                                     </button-toggler>
                                                     <h3>
                                                         {{ service.dispname || service.name }}
-                                                    </h3>
+													</h3>
                                                     <button class="mui-btn" @click="action_button(current[1], 'set_service/' + service.name + '/restart')">重启</button>
                                                     <a class="mui-btn" v-for="val, key in service.actions" v-if="['start', 'stop', 'restart'].indexOf(key) == -1" :href="val" target="_blank">{{ key }}</a>
+													</div>
                                                 </div>
                                             </div>
                                         </div>
