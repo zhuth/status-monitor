@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/opt/bin/python3
 # -*- coding: utf-8 -*-
 
 from flask import Flask, Response, jsonify, request, redirect
