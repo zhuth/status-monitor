@@ -1,17 +1,24 @@
-#!/usr/bin/python3
+#!/opt/bin/python3
 # -*- coding: utf-8 -*-
 
 # load config and set up async mode
 
 import yaml
 import os
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 cfg = {}
 if os.path.exists('config.yaml'):
     cfg = yaml.safe_load(open('config.yaml', encoding='utf-8'))
 
-if 'async_mode' not in cfg: cfg['async_mode'] = 'gevent'
-a = __import__(cfg['async_mode'])
-a.monkey_patch()
+if cfg.get('websocket'):
+    if 'async_mode' not in cfg: cfg['async_mode'] = 'gevent'
+    a = __import__(cfg['async_mode'])
+    if cfg['async_mode'] == 'gevent':
+        from gevent import monkey
+        monkey.patch_all()
+    elif cfg['async_mode'] == 'eventlet': a.monkey_patch()
 
 # normal imports
 
@@ -330,7 +337,11 @@ if __name__ == '__main__':
         parent = cfg['parent']
         if ':' in parent: parent, parent_port = parent.split(':')
         else: parent_port = 10000
-        class ActiveNodeThread(Thread):            
+        
+        class ActiveNodeThread(Thread):   
+            def __init__(self):
+                super().__init__(daemon=False)
+        
             def run(self):
                 while True:
                     s = SIOClient(parent, int(parent_port))
@@ -351,10 +362,11 @@ if __name__ == '__main__':
                             except Exception as ex:
                                 print(ex)
                                 break
+                        time.sleep(10)
                                 
         ActiveNodeThread().start()
     
-    if cfg.get('websocket', True):
+    if cfg.get('websocket'):
         import ws
         vars = globals()
         ws.apply(vars)

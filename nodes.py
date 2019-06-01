@@ -52,7 +52,7 @@ class StatusNode:
     def detect_power(self):
         if self.url:
             return None
-        return os.system('/bin/ping -c 1 {} > /dev/null'.format(self.ip)) == 0
+        return os.system('/bin/ping -w 1 -c 1 {} > /dev/null'.format(self.ip)) == 0
 
     def jcurl(self, *args):
         j = json.loads(_curl('{}{}'.format(self.base_url, ('/' + '/'.join(args)) if len(args) else ''),).content.decode('utf-8'))
@@ -154,10 +154,11 @@ class StatusNode:
 
 class AirPurifier(StatusNode):
 
-    def __init__(self, socket='/tmp/aqimonitor.socket', city='Beijing', interval=60):
+    def __init__(self, httpserv='', socket='/tmp/aqimonitor.socket', city='Beijing', interval=60):
         super().__init__(interval=interval)
         self._services = []
         self.socket = socket
+        self.httpserv = httpserv
         self.city = city
 
     def detect_power(self):
@@ -166,39 +167,56 @@ class AirPurifier(StatusNode):
     def icon_base64(self, aqio):
         if not isinstance(aqio, str):
             aqio = str(int(aqio))
-        aqi_icon = self.icon(aqio)
+        aqi_icon = self.icon(aqio) or b''
         return 'data:image/png;base64,' + base64.b64encode(aqi_icon).decode('ascii')
 
-    def call_command(self, cmd):
+    def try_connect(self):
         import socket
-        r = {}
         try:
             skt = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             skt.connect(self.socket)
-            skt.sendall(cmd.encode('utf-8'))
-            if cmd == '?':
-                tr = skt.recv(1024)
-                r = json.loads(
-                    tr[tr.find(b'{'):tr.rfind(b'}')+1].decode('utf-8'))
-                if r['aqi'] > 1000:
-                    raise Exception("Data range error.")
-            else:
-                r = b''
-                while True:
+            return skt
+        except:
+            pass
+
+    def call_command(self, cmd='?'):
+        r = b''
+        skt = self.try_connect()
+        if self.httpserv and len(cmd) == 1:
+            path = self.httpserv
+            if cmd != '?': path += cmd
+            try:
+                lines = requests.get(path).content.decode('ascii').split('\r\n')
+                if cmd == '?':
+                    r = {}
+                    paqi, pm, th = lines[:3]
+                    r['aqi'] = paqi
+                    r['pm25'], r['pm10'] = pm.split(' ')
+                    r['temp'], r['hum'] = th.split(' ')
+            except:
+                return
+        else:
+            try:
+                if not skt: return
+                skt.sendall(cmd.encode('utf-8'))
+                if cmd == '?':
                     tr = skt.recv(1024)
-                    if not tr:
-                        break
-                    r += tr
-            skt.close()
-        except TypeError as e:
-            r['aqi'] = '-'
-            r['error'] = str(e)
+                    r = json.loads(
+                        tr[tr.find(b'{'):tr.rfind(b'}')+1].decode('utf-8'))
+                    if r['aqi'] > 1000:
+                        raise Exception("Data range error.")
+                else:
+                    while True:
+                        tr = skt.recv(1024)
+                        if not tr:
+                            break
+                        r += tr
+                skt.close()
+            except TypeError as e:
+                r['aqi'] = '-'
+                r['error'] = str(e)
 
         if cmd == '?':
-            if r['aqi'] != '-':
-                r['aqi_icon'] = self.icon_base64(r['aqi'])
-                r['temp'] = str(int(r['temp'])) + 'd'
-                r['hum'] = str(int(r['hum'])) + '%'
             return r
         elif cmd.startswith('icon'):
             return r
@@ -213,8 +231,8 @@ class AirPurifier(StatusNode):
 
     def aqi_pred(self):
         return {
-            'first_half': float(self.call_command('pred0,12')),
-            'second_half': float(self.call_command('pred12,12'))
+            'first_half': float(self.call_command('pred0,12') or -1),
+            'second_half': float(self.call_command('pred12,12') or -1)
         }
 
     def city_aqi(self):
@@ -227,7 +245,12 @@ class AirPurifier(StatusNode):
             return '-'
 
     def _get_status(self):
-        d = self.call_command('?')
+        d = self.call_command('?') or {'aqi': '-'}
+        if d['aqi'] != '-':
+            d['aqi_icon'] = self.icon_base64(d['aqi'])
+            d['temp'] = str(int(d['temp'])) + 'd'
+            d['hum'] = str(int(d['hum'])) + '%'
+            
         pred = self.aqi_pred()
         d['aqi_pred'] = self.icon_base64('{}:{}'.format(
             int(pred['first_half']*30), int(pred['second_half']*30)))

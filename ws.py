@@ -10,7 +10,7 @@ thread = Thread()
 
 class QueryThread(Thread):
     def __init__(self, node_name, n, min_interval):
-        super().__init__()
+        super().__init__(daemon=True)
         self.node_name = node_name
         self.n = n
         self.interval = max(min_interval, self.n.interval)
@@ -18,13 +18,13 @@ class QueryThread(Thread):
         
     def run(self):
         while not thread_stop_event.isSet():
-            time.sleep(self.interval)
             try:
                 socketio.emit('stats', {'node': self.node_name, 'resp': self.n.get_status()}, namespace='/stats', broadcast=True)
             except TimeoutError:
                 pass
             except Exception as ex:
                 socketio.emit('stats', {'node': self.node_name, 'resp': {'error': str(ex)}}, namespace='/stats', broadcast=True)
+            thread_stop_event.wait(self.interval)
           
         
 def apply(vars):

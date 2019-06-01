@@ -12,6 +12,7 @@
         'tv': '电视',
         'nas': '文件服务器',
         'vultr': 'Vultr',
+        'sony': 'Sony',
         'switches': '开关组',
         'tplink': 'TP-Link',
         'services': '服务',

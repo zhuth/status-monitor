@@ -9,11 +9,11 @@ import os
 import AqiSprintarsForecast
 
 aqi_colors = ['009966', 'ffde33', 'ff9933', 'cc0033', '660099', '730023']
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 if not os.path.exists('FreeSansBold.ttf'):
     os.system('curl -L https://github.com/opensourcedesign/fonts/raw/master/gnu-freefont_freesans/FreeSansBold.ttf > FreeSansBold.ttf')
 fnt = ImageFont.truetype('FreeSansBold.ttf', 35)
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
 def aqi_pred(i, span):
@@ -52,8 +52,39 @@ def aqi(pm25at, pm10at):
    
     return max(a25(pm25at), a10(pm10at))
 
-    
+
+class NoneOpenable:
+    def __exit__(*args):
+        pass
+        
+    def __enter__(*args):
+        pass
+        
+    def __getattr__(name):
+        def __f(*args, **kwargs):
+            pass
+        return __f
+        
+
 def tcplistener(aport):
+
+    def openSerial():    
+        if aport == 'auto':
+            ports = [_ for _ in os.listdir('/dev/') if _.startswith('ttyACM')]
+            if len(ports) > 0:
+                port = '/dev/' + ports[0]
+            else:
+                return NoneOpenable()
+        else:
+            port = aport
+        
+        try:
+            ser = serial.Serial(port, 9600, timeout=10)
+        except Exception as ex:
+            ser = NoneOpenable()
+            
+        return ser
+        
 
     def mergeBytes(a, b):
         return (a<<8)|b
@@ -71,71 +102,69 @@ def tcplistener(aport):
         except:
             time.sleep(2)
             pass
-    port = aport
+            
     while True:
-        if aport == 'auto':
-            ports = [_ for _ in os.listdir('/dev/') if _.startswith('ttyACM')]
-            if len(ports) == 0:
-                time.sleep(1)
-                continue
-            port = '/dev/' + ports[0]
         try:
-            with serial.Serial(port, 9600, timeout=10) as ser:
-                time.sleep(1)
-                ser.write(b' -')
-                b = ''
-                while True:
-                    skt.listen(1)
-                    conn, addr = skt.accept()
-                    data = conn.recv(32)
+            skt.listen(1)
+                
+            b = ''
+            conn, addr = skt.accept()
+            data = conn.recv(32)
+            details = {}
+            if not data: continue
+            if data == b'?':
+                with openSerial():
+                    ser.flushInput()
                     details = {}
-                    if not data: continue
-                    if data == b'?':
-                        ser.flushInput()
-                        details = {}
-                        b = ser.read(32)
-                        while len(b) < 32:
-                            b += ser.read(32 - len(b))
-                        idx = b.find(b'\x42\x4d')
-                        if idx > 0:
-                            b = b[idx:]
-                            b += ser.read(idx)
-                        
-                        try:
-                            b = b[2:]
-                            if isinstance(b, str):
-                                b = [ord(_) for _ in b]
-                            details['pm1_at']  = mergeBytes(b[10], b[11])
-                            details['pm25_at'] = mergeBytes(b[12], b[13])
-                            details['pm10_at'] = mergeBytes(b[14], b[15])
-                            details['p03_c']   = mergeBytes(b[16], b[17])
-                            details['p05_c']   = mergeBytes(b[18], b[19])
-                            details['p1_c']    = mergeBytes(b[20], b[21])
-                            details['p25_c']   = mergeBytes(b[22], b[23])
-                            details['temp']    = mergeBytes(b[24], b[25]) / 10
-                            details['hum']     = mergeBytes(b[26], b[27]) / 10
-                            details['aqi']     = aqi(details['pm25_at'], details['pm10_at'])
-                            details['last_update'] = int(time.time() * 1000)
-                        except IndexError:
-                            pass
-                            
-                        conn.send(json.dumps(details).encode('utf-8'))
-                    elif data == b'/':
-                        ser.write(b' \n')
-                        ser.flushOutput()
-                    elif data.startswith(b'icon'):
-                        conn.send(icon(data[4:data.rfind(b'.')].decode('utf-8')))
-                    elif data.startswith(b'pred'):
-                        conn.send(aqi_pred(*[int(_) for _ in data[4:].split(',')]))
-                    else:
-                        ser.write(data + b'\n')
-                        ser.flushOutput()
-                        conn.send(b'OK')
-                    conn.close()
+                    b = ser.read(32)
+                    while len(b) < 32:
+                        b += ser.read(32 - len(b))
+                    idx = b.find(b'\x42\x4d')
+                    if idx > 0:
+                        b = b[idx:]
+                        b += ser.read(idx)
+                
+                try:
+                    b = b[2:]
+                    if isinstance(b, str):
+                        b = [ord(_) for _ in b]
+                    details['pm1_at']  = mergeBytes(b[10], b[11])
+                    details['pm25_at'] = mergeBytes(b[12], b[13])
+                    details['pm10_at'] = mergeBytes(b[14], b[15])
+                    details['p03_c']   = mergeBytes(b[16], b[17])
+                    details['p05_c']   = mergeBytes(b[18], b[19])
+                    details['p1_c']    = mergeBytes(b[20], b[21])
+                    details['p25_c']   = mergeBytes(b[22], b[23])
+                    details['temp']    = mergeBytes(b[24], b[25]) / 10
+                    details['hum']     = mergeBytes(b[26], b[27]) / 10
+                    details['aqi']     = aqi(details['pm25_at'], details['pm10_at'])
+                    details['last_update'] = int(time.time() * 1000)
+                except IndexError:
+                    pass
+                    
+                conn.send(json.dumps(details).encode('utf-8'))
+                
+            elif data == b'/':
+                with openSerial():
+                    ser.write(b' \n')
+                    ser.flushOutput()
+                    
+            elif data.startswith(b'icon'):
+                conn.send(icon(data[4:data.rfind(b'.')].decode('utf-8')))
+                
+            elif data.startswith(b'pred'):
+                conn.send(aqi_pred(*[int(_) for _ in data[4:].split(',')]))
+                
+            else:
+                with openSerial():
+                    ser.write(data + b'\n')
+                    ser.flushOutput()
+                    conn.send(b'OK')
+                    
+            conn.close()
         except KeyboardInterrupt:
-            skt.close()
-            break
-        except Exception as ex:
+            exit()
+        except:
             time.sleep(1)
 
 
