@@ -62,7 +62,7 @@
                         <div class="mui-panel" id="u_main">
                             <section v-if="current[0] === 'node'">
                                 <div v-if="resp[current[1]]">
-                                    <h1 id="n_name">{{ config.node_names[current[1]] || (config.node_names[current[0]] + (current[1] || '')) }}
+                                    <h1 id="n_name">{{ config.node_names[current[1]] || ((config.node_names[current[0]] || '') + (current[1] || '')) }}
                                         <button-toggler :node="current[1]" action="power" :val="resp[current[1]]['power']"></button-toggler>
                                     </h1>
                                     <div v-if="current[1] !== 'air'">
@@ -80,18 +80,23 @@
                                                 <div>
                                                     <button class="mui-btn mui-btn--primary" @click="action_button(current[1], 'reboot')">重启</button>
                                                     <button class="mui-btn mui-btn--danger" @click="action_button(current[1], 'force_off')">强制关机</button>
-                                                    <button v-for="shortcut in ['df', 'top/-b/-n1']" @click="action_button(current[1], 'run/' + shortcut)" class="mui-btn">{{ shortcut.split('/')[0] }}</button>
+                                                    <button v-for="shortcut in ['df', 'top/-n1']" @click="action_button(current[1], 'run/' + shortcut)" class="mui-btn">{{ shortcut.split('/')[0] }}</button>
                                                     <br>
                                                     <textarea v-show="output" :value="output" rows="10" disabled></textarea>
                                                 </div>
                                             </div>
                                             <div class="mui-tabs__pane" id="pane-node-services">
-                                                <h2 v-for="service, service_name in resp[current[1]].services">
-                                                    <button-toggler :val="service.status" :node="current[1]" :action="'service/' + service.name">
+                                                <div v-for="service, service_name in resp[current[1]].services">
+                                                    <div>
+													<button-toggler :val="service.status" :node="current[1]" :action="'service/' + service.name">
                                                     </button-toggler>
-                                                    {{ service.dispname || service.name }}
-                                                    <button class="mui-btn" v-for="val, key in service.actions" @click="action_buton(current[1], 'link', {'link': val})">{{ key }}</button>
-                                                </h2>
+                                                    <h3>
+                                                        {{ service.dispname || service.name }}
+													</h3>
+                                                    <button class="mui-btn" @click="action_button(current[1], 'set_service/' + service.name + '/restart')">重启</button>
+                                                    <a class="mui-btn" v-for="val, key in service.actions" v-if="['start', 'stop', 'restart'].indexOf(key) == -1" :href="val" target="_blank">{{ key }}</a>
+													</div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -110,13 +115,13 @@
 
                                         <h2>操作</h2>
                                         <div>
-                                            <button @click="action_buton('air', 'power_on')" class="mui-btn button-on">开</button>
-                                            <button @click="action_buton('air', 'speed1')" class="mui-btn mui-btn--primary">速度1</button>
-                                            <button @click="action_buton('air', 'speed2')" class="mui-btn mui-btn--primary">速度2</button>
+                                            <button @click="action_button('air', 'power_on')" class="mui-btn button-on">开</button>
+                                            <button @click="action_button('air', 'speed1')" class="mui-btn mui-btn--primary">速度1</button>
+                                            <button @click="action_button('air', 'speed2')" class="mui-btn mui-btn--primary">速度2</button>
                                         </div>
                                         <div>
-                                            <button @click="action_buton('air', 'power_off')" class="mui-btn button-off">关</button>
-                                            <button @click="action_buton('air', 'reset')" class="mui-btn mui-btn--accent">重置</button>
+                                            <button @click="action_button('air', 'power_off')" class="mui-btn button-off">关</button>
+                                            <button @click="action_button('air', 'reset')" class="mui-btn mui-btn--accent">重置</button>
                                         </div>
                                     </div>
                                 </div>
@@ -124,10 +129,10 @@
 
                             <section v-else-if="current[0] === 'switches'">
                                 <div v-for="n in switch_nodes">
-                                    <h2>
-                                        <button-toggler v-if="resp[n]" :node="n" action="power" :val="resp[n]['power']"></button-toggler>
+                                    <button-toggler v-if="resp[n]" :node="n" action="power" :val="resp[n]['power']"></button-toggler>
+                                    <h3>
                                         {{ config.node_names[n] || n }}
-                                    </h2>
+                                    </h3>
                                 </div>
                             </section>
 

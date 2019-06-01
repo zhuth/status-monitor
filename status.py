@@ -1,9 +1,30 @@
 #!/opt/bin/python3
 # -*- coding: utf-8 -*-
 
+# load config and set up async mode
+
+import yaml
+import os
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+cfg = {}
+if os.path.exists('config.yaml'):
+    cfg = yaml.safe_load(open('config.yaml', encoding='utf-8'))
+
+if cfg.get('websocket'):
+    if 'async_mode' not in cfg: cfg['async_mode'] = 'gevent'
+    a = __import__(cfg['async_mode'])
+    if cfg['async_mode'] == 'gevent':
+        from gevent import monkey
+        monkey.patch_all()
+    elif cfg['async_mode'] == 'eventlet': a.monkey_patch()
+
+# normal imports
+
 from flask import Flask, Response, jsonify, request, redirect
 
-import os, psutil, json, time, base64, sys, re, yaml
+import psutil, json, time, base64, sys, re
 from datetime import datetime, timedelta
 import requests
 import subprocess
@@ -11,10 +32,6 @@ import traceback
 
 path = os.path.dirname(__file__) or '.'
 os.chdir(path)
-
-cfg = {}
-if os.path.exists('config.yaml'):
-    cfg = yaml.load(open('config.yaml', encoding='utf-8'))
 
 import nodes
 nodes.StatusNode.timeout = cfg.get('timeout', 1)
@@ -46,8 +63,11 @@ class SelfNode(nodes.StatusNode):
         for n in self.config.get('nodes', []):
             n = dict(n)
             name = n['name']
-            cls = nodes.__dict__.get(n.get('type'), nodes.StatusNode)
-            if cls is nodes.DelegateNode:
+            cls = nodes.__dict__.get(n.get('type', 'StatusNode'))
+            if cls is None:
+                print('No such type', n['type'])
+                continue
+            elif cls is nodes.DelegateNode:
                 if 'parent' not in n: continue
                 del n['type']
                 n['parent'] = self.nodes[n['parent']]
@@ -55,7 +75,10 @@ class SelfNode(nodes.StatusNode):
             else:
                 if 'type' in n: del n['type']
                 del n['name']
-                n = cls(**n)
+                try:
+                    n = cls(**n)
+                except TypeError as te:
+                    raise te
             self.nodes[name] = n
 
     def detect_power(self):
@@ -144,12 +167,11 @@ class SelfNode(nodes.StatusNode):
             message = vars['message']
             if message and message.startswith('err'):
                 return {'error': message[4:]}
-        
-        if self.power_ip:
+            else:
+                return {'message': message}
+        else:
             os.system('shutdown now')
             return True
-        
-        return {'error': 'No power-up method, shutting down is forbidden.'}
     
     def reboot(self):
         os.system('reboot')
@@ -243,6 +265,8 @@ def node_call(node_name='self', cmd='get_status', arg=''):
                     r = filter_password(dict(r))
                 if cmd == 'node':
                     return r
+                elif isinstance(r, dict) and 'error' in r:
+                    return r
                 else:
                     return {'node': node_name, 'resp': r}
         except Exception as ex:
@@ -311,11 +335,16 @@ if __name__ == '__main__':
         from threading import Thread
         from socketIO_client import SocketIO as SIOClient, LoggingNamespace
         parent = cfg['parent']
+        if ':' in parent: parent, parent_port = parent.split(':')
+        else: parent_port = 10000
         
-        class ActiveNodeThread(Thread):            
+        class ActiveNodeThread(Thread):   
+            def __init__(self):
+                super().__init__(daemon=False)
+        
             def run(self):
                 while True:
-                    s = SIOClient(parent, 10000)
+                    s = SIOClient(parent, int(parent_port))
                     st = s.define(LoggingNamespace, '/nodes')
                     with s:
                         while True:
@@ -333,13 +362,14 @@ if __name__ == '__main__':
                             except Exception as ex:
                                 print(ex)
                                 break
+                        time.sleep(10)
                                 
         ActiveNodeThread().start()
     
-    if cfg.get('websocket', True):
+    if cfg.get('websocket'):
         import ws
         vars = globals()
         ws.apply(vars)
     else:
         print('Web Socket disabled')
-        app.run(host='0.0.0.0', port=10000, debug=True)
+        app.run(host='0.0.0.0', port=cfg.get('port', 10000), debug=True)

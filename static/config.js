@@ -1,5 +1,5 @@
-var config = {
-    default_node: 'self',
+﻿var config = {
+    default_hash: 'switches',
     video_provider: '/stream/?action=snapshot_{channel}&_t={t}',
     video_channels: ['0', '1'],
     node_names: {
@@ -11,6 +11,8 @@ var config = {
         'lamp': '灯',
         'tv': '电视',
         'nas': '文件服务器',
+        'vultr': 'Vultr',
+        'sony': 'Sony',
         'switches': '开关组',
         'tplink': 'TP-Link',
         'services': '服务',

@@ -10,7 +10,7 @@ thread = Thread()
 
 class QueryThread(Thread):
     def __init__(self, node_name, n, min_interval):
-        super().__init__()
+        super().__init__(daemon=True)
         self.node_name = node_name
         self.n = n
         self.interval = max(min_interval, self.n.interval)
@@ -18,23 +18,19 @@ class QueryThread(Thread):
         
     def run(self):
         while not thread_stop_event.isSet():
-            time.sleep(self.interval)
             try:
                 socketio.emit('stats', {'node': self.node_name, 'resp': self.n.get_status()}, namespace='/stats', broadcast=True)
             except TimeoutError:
                 pass
             except Exception as ex:
                 socketio.emit('stats', {'node': self.node_name, 'resp': {'error': str(ex)}}, namespace='/stats', broadcast=True)
+            thread_stop_event.wait(self.interval)
           
         
 def apply(vars):
     cfg, app, selfnode = vars['cfg'], vars['app'], vars['selfnode']
     global socketio, thread
-    if cfg.get('async_mode', 'gevent') == 'eventlet':
-        import eventlet
-        eventlet.monkey_patch()
-    
-    socketio = SocketIO(app, async_mode=cfg.get('async_mode', 'gevent'))
+    socketio = SocketIO(app, async_mode=cfg['async_mode'])
     
     @socketio.on('pull', namespace='/stats')
     @socketio.on('connect', namespace='/stats')
@@ -67,4 +63,4 @@ def apply(vars):
         if n and hasattr(n, 'set_buffer'):
             n.set_buffer(data)
     
-    socketio.run(app, host='0.0.0.0', port=10000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=cfg.get('port', 10000), debug=True)

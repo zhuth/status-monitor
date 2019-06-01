@@ -27,6 +27,10 @@ textarea {
     width: 100%;
 }
 
+[v-cloak] {
+    display: none;
+}
+
 
 /**
   * Layout CSS
@@ -280,5 +284,24 @@ img.aqi-icons {
 img[alt="video"] {
     max-width: 100%;
     height: auto;
-	margin: 5px;
+    margin: 5px;
+}
+
+h3 {
+    display: inline-block;
+    width: 100px;
+    padding-left: 10px;
+}
+
+span.actions {
+    position: relative;
+    float: right;
+}
+
+.mui-panel p {
+    clear: both;
+}
+
+span.actions a {
+    cursor: pointer;
 }
