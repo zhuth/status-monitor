@@ -77,6 +77,11 @@
                           resp[current[1]].uptime }}</span> /
                                                     <temperature-viewer :val="resp[current[1]].temp"></temperature-viewer>
                                                 </p>
+                                                <p>
+                                                    磁盘使用 <br><span id="n_disks">
+                                                        <span v-for="disk in resp[current[1]].disks">{{ disk }}<br></span>
+                                                    </span>
+                                                </p>
                                                 <div>
                                                     <button class="mui-btn mui-btn--primary" @click="action_button(current[1], 'reboot')">重启</button>
                                                     <button class="mui-btn mui-btn--danger" @click="action_button(current[1], 'force_off')">强制关机</button>

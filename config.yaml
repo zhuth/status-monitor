@@ -1,0 +1,93 @@
+temperature_method: |
+  with open('/proc/dmu/temperature', encoding='ascii', errors='ignore') as f:
+    temp = f.read()[:-2].split()[-1][:-1] + 'd'
+interval: 30
+timeout: 2
+name: router
+websocket: true
+#async_mode: eventlet
+allowed_commands: ['ps', 'df', 'top']
+nodes:
+- name: pi
+  ip: 192.168.0.99
+  interval: 30
+- name: sony
+  ip: 192.168.1.4
+  power_ip: 192.168.0.64
+  interval: 30
+- name: nas
+  ip: 192.168.0.97
+  power_ip: 'wol:24:5E:BE:2D:66:F9'
+  interval: 30
+- name: computer
+  ip: 192.168.0.3
+  power_ip: 'wol:B0:6E:BF:36:3C:C2'
+  interval: 30
+- name: lamp
+  power_ip: 192.168.0.61
+  type: SwitchNode
+- name: printer
+  power_ip: 192.168.0.62
+  type: SwitchNode
+- name: tv
+  power_ip: 192.168.0.65
+  type: KonkeNode
+- name: air
+  type: AirPurifier
+  city: Shanghai/luwanshizhuanfuxiao
+  httpserv: http://192.168.1.66/
+  interval: 30
+- name: tplink
+  type: TpLinkRouterNode
+  ip: 192.168.0.254
+  password: F8e2B5V4a
+  interval: 600
+- name: vultr
+  url: https://zhu.tianhua.me/status/
+  interval: 43200
+services:
+- proc: ocserv-main
+  name: S79ocserv
+  dispname: ocserv
+- proc: dnsmasq
+  name: dnsmasq
+  actions:
+    restart: service restart_dnsmasq
+    start: "-"
+    stop: "-"
+- proc: privoxy
+  name: S24privoxy
+  dispname: privoxy
+- proc: radicale
+  name: S89radicale
+  dispname: radicale
+- proc: v2ray
+  name: S83v2ray
+  dispname: v2ray
+- proc: aria2c
+  name: S81aria2
+  dispname: aria2
+  actions:
+    View: "/yaaw"
+- proc: redsocks
+  name: S23redsocks
+  dispname: redsocks
+crons: # not implemented
+- days: '1-5'
+  time: '9:00'
+  cmd: 'node/tplink/set_service/wlan5g/stop'
+- days: '1-5'
+  time: '22:00'
+  cmd: 'node/tplink/set_service/wlan5g/stop'
+- days: '1-5'
+  time: '18:00'
+  cmd: 'node/tplink/set_service/wlan5g/start'
+- days: '*'
+  time: '6:00'
+  cmd: 'node/tplink/set_service/wlan5g/start'
+- days: '*'
+  time: '6:00'
+  cmd: 'node/tv/power_on'
+- days: '*'
+  time: '22:00'
+  cmd: 'node/tv/power_off'
