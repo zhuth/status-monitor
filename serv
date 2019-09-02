@@ -1,13 +1,1 @@
-#!/bin/sh
-
-ENABLED=yes
-PROCS=status-monitor
-ARGS=""
-PREARGS=""
-DESC=$PROCS
-PATH=/opt/sbin:/opt/bin:/opt/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-ps | grep status.py | grep "^[0-9]\+" -o | xargs kill -9 2>/dev/null || true
-
-. /opt/etc/init.d/rc.func
-
+/opt/etc/init.d/S82status

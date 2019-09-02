@@ -326,17 +326,19 @@ class KonkeNode(SwitchNode):
     """
 
     def __init__(self, power_ip):
-        super().__init__(power_ip)
+        super().__init__(power_ip=power_ip)
         from pykonkeio import Switch
-        self._konke = Switch(self.power_ip)
+        self._konke = Switch(power_ip)
 
     def detect_power(self):
+        print(self._konke.status)
         return self._konke.status == 'open'
 
     def power_off(self):
         return self._konke.turn_off()
     
     def power_on(self):
+        print('power on')
         return self._konke.turn_on()
 
 
