@@ -4,13 +4,14 @@ temperature_method: |
 interval: 30
 timeout: 2
 name: router
-websocket: true
+websocket: false
 #async_mode: eventlet
 allowed_commands: ['ps', 'df', 'top']
 nodes:
 - name: pi
-  ip: 192.168.0.99
-  interval: 30
+  url: http://192.168.8.254:10000/
+  port: 10000
+  interval: 60
 - name: sony
   ip: 192.168.1.4
   power_ip: 192.168.0.64
@@ -39,7 +40,7 @@ nodes:
   interval: 30
 - name: tplink
   type: TpLinkRouterNode
-  ip: 192.168.0.254
+  ip: 192.168.0.245
   password: F8e2B5V4a
   interval: 600
 - name: vultr

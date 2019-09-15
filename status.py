@@ -338,43 +338,35 @@ if __name__ == '__main__':
     
     if cfg.get('parent'):
         from threading import Thread
-        from socketIO_client import SocketIO as SIOClient, LoggingNamespace
         parent = cfg['parent']
-        if ':' in parent: parent, parent_port = parent.split(':')
-        else: parent_port = 10000
-        
+        if '://' not in parent: parent = 'http://' + parent
+
         class ActiveNodeThread(Thread):   
             def __init__(self):
                 super().__init__(daemon=False)
         
             def run(self):
                 while True:
-                    s = SIOClient(parent, int(parent_port))
-                    st = s.define(LoggingNamespace, '/nodes')
-                    with s:
-                        while True:
-                            try:
-                                print('push')
-                                st.emit('push', {
-                                    'node': cfg['name'],
-                                    'status': selfnode.get_status(),
-                                    'services': selfnode.services
-                                })
-                                s.wait(seconds=1)
-                                time.sleep(30)
-                            except KeyboardInterrupt:
-                                exit()
-                            except Exception as ex:
-                                print(ex)
-                                break
-                        time.sleep(10)
+                    try:
+                        r = requests.put(parent + 'node/' + cfg.get('name'), data=json.dumps({
+                            'node': cfg.get('name'),
+                            'status': selfnode.get_status()
+                        }), headers={"Content-Type": "application/json"})
+                        if r.status_code != 201:
+                            rc = r.content
+                            raise Exception(rc)
+                    except Exception as ex:
+                        print(ex)
+                        continue
+                    time.sleep(cfg.get('interval', 30))
                                 
         ActiveNodeThread().start()
     
-    if cfg.get('websocket'):
-        import ws
-        vars = globals()
-        ws.apply(vars)
-    else:
-        print('Web Socket disabled')
-        app.run(host='0.0.0.0', port=cfg.get('port', 10000), debug=True)
+    if cfg.get('http_serv', True):
+        if cfg.get('websocket'):
+            import ws
+            vars = globals()
+            ws.apply(vars)
+        else:
+            print('Web Socket disabled')
+            app.run(host='0.0.0.0', port=cfg.get('port', 10000), debug=True)

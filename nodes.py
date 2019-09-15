@@ -33,12 +33,6 @@ class StatusNode:
         self.url = url
         if url:
             self.base_url = url + 'node/self'
-            self.ip = url.split('://', 1)[1].split('/')[0]
-            if ':' in self.ip:
-                self.ip, self.port = url.rsplit(':', 1)
-                self.port = int(self.port)
-            else:
-                self.port = 80
         else:
             self.ip = ip
             self.port = port
@@ -61,7 +55,7 @@ class StatusNode:
 
     @property
     def services(self):
-        if self._services == 'auto' and self.ip:
+        if self._services == 'auto' and self.base_url:
             try:
                 self.services = self.jcurl('services')
             except TimeoutError:
@@ -69,7 +63,7 @@ class StatusNode:
             except KeyError:
                 pass
             except json.decoder.JSONDecodeError:
-                print('Error while loading from {}'.format(self.ip))
+                print('Error while loading from {}'.format(self.base_url))
                 pass
         return self._services if isinstance(self._services, list) else []
 
@@ -325,14 +319,17 @@ class KonkeNode(SwitchNode):
     Konke Switch
     """
 
-    def __init__(self, power_ip):
-        super().__init__(power_ip=power_ip)
+    @property
+    def _konke(self):
         from pykonkeio import Switch
-        self._konke = Switch(power_ip)
+        return Switch(self.power_ip)
 
+    def __init__(self, power_ip):
+        super().__init__(power_ip)
+        
     def detect_power(self):
-        print(self._konke.status)
-        return self._konke.status == 'open'
+        st = self._konke.status
+        if st != 'offline': return st == 'open'
 
     def power_off(self):
         return self._konke.turn_off()
