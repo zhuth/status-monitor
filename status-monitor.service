@@ -1,0 +1,18 @@
+[Unit]
+Description=Status Monitor
+Documentation=https://github.com/zhuth/status-monitor
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+Restart=on-abnormal
+User=root
+Group=root
+WorkingDirectory=/home/pi/status-monitor
+ExecStart=/usr/bin/python3 /home/pi/status-monitor/status.py
+ExecReload=/bin/kill -USR1 $MAINPID
+KillMode=mixed
+KillSignal=SIGQUIT
+
+[Install]
+WantedBy=multi-user.target

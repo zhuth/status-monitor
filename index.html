@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Status Monitor</title>
+    <link href="static/mui.min.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="static/controls.css">
+    <script src="static/mui.min.js"></script>
+    <script src="static/jquery.min.js"></script>
+    <script src="static/vue.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div id="sidedrawer" class="mui--no-user-select">
+            <div id="sidedrawer-brand" class="mui--appbar-line-height">
+                <span class="mui--text-title">Status Monitor</span>
+            </div>
+            <div class="mui-divider"></div>
+            <ul>
+                <li>
+                    <strong>节点</strong>
+                    <ul>
+                        <li class="pointer" v-for="node in nodes" @click="navigate('node/' + node)" :class="{active: current[0] == 'node' &&
+                current[1] == node}">{{ config.node_names[node] || node }}</li>
+                    </ul>
+                </li>
+                <li :class="{active:
+            current[0] == 'switches'}">
+                    <strong @click="navigate('switches')">开关组</strong>
+                </li>
+                <li :class="{active:
+          current[0] == 'cameras'}">
+                    <strong @click="navigate('cameras')">摄像头</strong>
+                </li>
+            </ul>
+        </div>
+        <header id="header">
+            <div class="mui-appbar mui--appbar-line-height">
+                <div class="mui-container-fluid">
+                    <a class="sidedrawer-toggle
+              mui--visible-xs-inline-block
+              mui--visible-sm-inline-block js-show-sidedrawer">☰</a>
+                    <a class="sidedrawer-toggle mui--hidden-xs
+              mui--hidden-sm js-hide-sidedrawer">☰</a>
+                    <span class="mui--text-title
+              mui--visible-xs-inline-block">Status Monitor</span>
+                </div>
+            </div>
+        </header>
+
+        <div id="content-wrapper">
+            <div id="appbar-placeholder" class="mui--appbar-height"></div>
+            <div class="mui-container-fluid">
+                <div class="mui-row">
+                    <div class="mui-col-sm-10 mui-col-sm-offset-1">
+                        <div class="space-top"></div>
+                        <p>&nbsp;</p>
+                        <div class="mui-panel" id="u_main">
+                            <section v-if="current[0] === 'node'">
+                                <div v-if="resp[current[1]]">
+                                    <h1 id="n_name">{{ config.node_names[current[1]] || ((config.node_names[current[0]] || '') + (current[1] || '')) }}
+                                        <button-toggler :node="current[1]" action="power" :val="resp[current[1]]['power']"></button-toggler>
+                                    </h1>
+                                    <div v-if="current[1] !== 'air'">
+                                        <div v-show="resp[current[1]].power">
+                                            <ul class="mui-tabs__bar">
+                                                <li class="mui--is-active"><a data-mui-toggle="tab" data-mui-controls="pane-node-status">状态</a></li>
+                                                <li><a data-mui-toggle="tab" data-mui-controls="pane-node-services">服务</a></li>
+                                            </ul>
+                                            <div class="mui-tabs__pane mui--is-active" id="pane-node-status">
+                                                <p>
+                                                    负载 <span id="n_uptime">{{
+                          resp[current[1]].uptime }}</span> /
+                                                    <temperature-viewer :val="resp[current[1]].temp"></temperature-viewer>
+                                                </p>
+                                                <p>
+                                                    磁盘使用 <br><span id="n_disks">
+                                                        <span v-for="disk in resp[current[1]].disks">{{ disk }}<br></span>
+                                                    </span>
+                                                </p>
+                                                <div>
+                                                    <button class="mui-btn mui-btn--primary" @click="action_button(current[1], 'reboot')">重启</button>
+                                                    <button class="mui-btn mui-btn--danger" @click="action_button(current[1], 'force_off')">强制关机</button>
+                                                    <button v-for="shortcut in resp[current[1]].shortcuts || ['df', 'top/-n1']" @click="action_button(current[1], 'run/' + shortcut)" class="mui-btn">{{ shortcut.split('/')[0] }}</button>
+                                                    <br>
+                                                    <textarea v-show="output" :value="output" rows="10" disabled></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="mui-tabs__pane" id="pane-node-services">
+                                                <div v-for="service, service_name in resp[current[1]].services">
+                                                    <div>
+													<button-toggler :val="service.status" :node="current[1]" :action="'service/' + service.name">
+                                                    </button-toggler>
+                                                    <h3>
+                                                        {{ service.dispname || service.name }}
+													</h3>
+                                                    <button class="mui-btn" @click="action_button(current[1], 'set_service/' + service.name + '/restart')">重启</button>
+                                                    <a class="mui-btn" v-for="val, key in service.actions" v-if="['start', 'stop', 'restart'].indexOf(key) == -1" :href="val" target="_blank">{{ key }}</a>
+													</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div v-else>
+                                        <h2>状态</h2>
+                                        <p v-if="resp.air">
+                                            <img :src="resp.air.aqi_icon" alt="" id="n_aqi_icon" class="aqi-icons">
+                                            <img :src="resp.air.city_aqi" alt="" id="n_city_aqi" class="aqi-icons">
+                                            <img :src="resp.air.aqi_pred" alt="" id="n_aqi_pred" class="aqi-icons">
+                                        </p>
+                                        <p>
+                                            <temperature-viewer :val="resp[current[1]].temp"></temperature-viewer>
+                                            /
+                                            <span id="n_hum">{{ resp.air.hum }}</span>
+                                        </p>
+
+                                        <h2>操作</h2>
+                                        <div>
+                                            <button @click="action_button('air', 'power_on')" class="mui-btn button-on">开</button>
+                                            <button @click="action_button('air', 'speed1')" class="mui-btn mui-btn--primary">速度1</button>
+                                            <button @click="action_button('air', 'speed2')" class="mui-btn mui-btn--primary">速度2</button>
+                                        </div>
+                                        <div>
+                                            <button @click="action_button('air', 'power_off')" class="mui-btn button-off">关</button>
+                                            <button @click="action_button('air', 'reset')" class="mui-btn mui-btn--accent">重置</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section v-else-if="current[0] === 'switches'">
+                                <div v-for="n in switch_nodes">
+                                    <button-toggler v-if="resp[n]" :node="n" action="power" :val="resp[n]['power']"></button-toggler>
+                                    <h3>
+                                        {{ config.node_names[n] || n }}
+                                    </h3>
+                                </div>
+                            </section>
+
+                            <section v-else-if="current[0] === 'cameras'">
+                                <img v-for="channel in config.video_channels" :src="config.video_provider.replace('{channel}', channel).replace('{t}', _t)" :data-channel="channel" alt="video">
+                            </section>
+
+                            <div class="space-bottom"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer id="footer">
+        <div class="mui-container-fluid">
+            <br> Made with <a href="https://www.muicss.com">MUI</a>, <a href="//vuejs.org">Vue.js</a> & <a href="//jquery.com">jQuery</a>.
+        </div>
+    </footer>
+
+    <script src="static/config.js"></script>
+    <script src="static/controls.js"></script>
+</body>
+
+</html>
