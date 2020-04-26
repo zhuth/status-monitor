@@ -141,10 +141,13 @@ class SelfNode(nodes.StatusNode):
             psutil.cpu_percent(interval=None), ' '.join([ '%.2f' % _ for _ in os.getloadavg()]),
             meminfo())
 
-        status['disks'] = [
-            '{} {:.01f}%'.format(d.mountpoint, usage.percent)
-            for d, usage in [(disk, psutil.disk_usage(disk.mountpoint)) for disk in psutil.disk_partitions()]
-        ]
+        status['disks'] = []        
+        for disk in psutil.disk_partitions():
+            try:
+                usage = psutil.disk_usage(disk.mountpoint)
+                status['disks'].append('{} {:.01f}%'.format(disk.mountpoint, usage.percent))
+            except PermissionError:
+                pass
 
         status['temp'] = temperature()
         return status
