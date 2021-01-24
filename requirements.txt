@@ -6,4 +6,4 @@ psutil
 wakeonlan
 pyserial
 pyyaml
-eventlet
+gevent
