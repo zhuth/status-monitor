@@ -15,6 +15,7 @@ if cfg.get('websocket'):
         monkey.patch_all()
     elif cfg['async_mode'] == 'eventlet': a.monkey_patch()
 
+DOCKER_EXEC = cfg.get('docker_exec', 'docker')
 
 import psutil, json, time, base64, sys, re
 import requests
@@ -99,7 +100,11 @@ class SelfNode(nodes.StatusNode):
                 return '{:.1f}d'.format(temp / 1000)
             else:
                 return ''
-                
+        
+        def docker_status(container):
+            s = subprocess.check_output([DOCKER_EXEC, 'ps']).decode('utf-8').split()
+            return container in s
+        
         status = {}
 
         status['shortcuts'] = cfg.get('shortcuts', [])
@@ -111,6 +116,13 @@ class SelfNode(nodes.StatusNode):
                     status['services'][_['name']] = {
                         'status': False,
                         'dispname': _.get('dispname', _['name']),
+                        'name': _['name'],
+                        'actions': _.get('actions', [])
+                    }
+                elif 'container' in _:
+                    status['services'][_['name']] = {
+                        'status': docker_status(_['container']),
+                        'dispname': _.get('dispname', _['container']),
                         'name': _['name'],
                         'actions': _.get('actions', [])
                     }
@@ -140,13 +152,16 @@ class SelfNode(nodes.StatusNode):
         t = time.time() - psutil.boot_time()
         status['uptime'] = '{}:{:02d}:{:02d}:{:02d} {:.01f}% {} Mem: {}'.format(
             int(t / 86400), int(t / 3600) % 24, int(t % 3600 / 60), int(t % 60),
-            psutil.cpu_percent(interval=None), ' '.join([ '%.2f' % _ for _ in os.getloadavg()]),
+            psutil.cpu_percent(interval=None), ' '.join(['%.2f' % _ for _ in os.getloadavg()]),
             meminfo())
 
-        status['disks'] = [
-            '{} {:.01f}%'.format(d.mountpoint, usage.percent)
-            for d, usage in [(disk, psutil.disk_usage(disk.mountpoint)) for disk in psutil.disk_partitions()]
-        ]
+        status['disks'] = []        
+        for disk in psutil.disk_partitions():
+            try:
+                usage = psutil.disk_usage(disk.mountpoint)
+                status['disks'].append('{} {:.01f}%'.format(disk.mountpoint, usage.percent))
+            except PermissionError:
+                pass
 
         status['temp'] = temperature()
         return status
@@ -183,6 +198,8 @@ class SelfNode(nodes.StatusNode):
                     __act(actions, 'start')
                 else:
                     os.system(action)
+            elif service_name.startswith('@docker:'):
+                subprocess.run([DOCKER_EXEC, cmd, service_name.split(':', 1)[1]])
             else:
                 os.system(self._service_cmd.format(cmd=cmd, name=service_name))
     
@@ -196,8 +213,12 @@ class SelfNode(nodes.StatusNode):
     def services(self):
         if self._services == 'auto':
             services = self.config.get('services', [])
-            services = [_ for _ in services if not _.get('uname', '').startswith('//')]
+            services = [_ for _ in services if not _['name'].startswith('//')]
 
+            for service in services:
+                if service['name'].startswith('@docker:'):
+                    service['container'] = service['name'].split(':', 1)[1]
+            
             self.serv_procs = dict([(_['proc'] + ':' + _.get('uname', ''), _)
                                     for _ in services if '@' not in _['name']])
             self._services = services
