@@ -101,7 +101,9 @@ class SelfNode(nodes.StatusNode):
                 return ''
                 
         status = {}
-        
+
+        status['shortcuts'] = cfg.get('shortcuts', [])
+
         status['services'] = {}
         if self.services:
             for _ in self.services:
