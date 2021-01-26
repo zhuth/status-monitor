@@ -106,8 +106,9 @@ def node_put_status(node_name):
 
 @app.route('/auth', methods=['POST', 'GET'])
 def auth_deal():
-    if 'password' not in cfg: 
+    if is_authenticated():
         return jsonify({'authenticated': True})
+
     atoken = request.form.get('token')
     apassword = request.form.get('password')
     if apassword and crypt(apassword) == cfg['password']:

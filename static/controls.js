@@ -119,7 +119,7 @@
         }
     });
 
-    $.get('node/self').then((data) => {
+    $get('node/self').then((data) => {
         for (let node in data.resp.nodes) {
             if (['SwitchNode', 'KonkeNode'].indexOf(data.resp.nodes[node]) < 0) app.nodes.push(node);
             else app.switch_nodes.push(node);
