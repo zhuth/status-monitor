@@ -9,20 +9,20 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 import traceback
 from datetime import datetime, timedelta
+import time
 from flask import Flask, Response, jsonify, request, redirect
+import hashlib
+crypt = lambda x: hashlib.sha1(x.encode('utf-8')).hexdigest()
 
 path = os.path.dirname(__file__) or '.'
 os.chdir(path)
 
 from selfnode import selfnode, cfg, nodes
-   
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = cfg.get('secret_key', 'secret!')
 
-import hashlib
-md5 = lambda x: hashlib.md5(x.encode('utf-8')).hexdigest()
-cfg['encrypted_password'] = '' if 'password' not in cfg else md5(cfg['password'] + md5(app.config['SECRET_KEY']))
-
+tokens = set()
 
 def client_ip():
     return request.environ.get('HTTP_X_FORWARDED_FOR', request.environ['REMOTE_ADDR']).split(', ')[0]
@@ -38,7 +38,7 @@ def is_authenticated():
                 return True
     
     if 'password' in cfg:
-        return request.cookies.get('auth') == cfg['encrypted_password']
+        return request.form.get('token') in tokens
     
     return True
 
@@ -81,8 +81,8 @@ def node_call(node_name='self', cmd='get_status', arg=''):
         return {'error': 'No command {} for node {}. Choices are: {}'.format(cmd, node_name, ', '.join(dir(n)))}
         
         
-@app.route('/node/<node_name>/<path:cmd>')
-@app.route('/node/<node_name>')
+@app.route('/node/<node_name>/<path:cmd>', methods=['POST', 'GET'])
+@app.route('/node/<node_name>', methods=['POST', 'GET'])
 def node(node_name='self', cmd='get_status', arg=''):
     if not is_authenticated(): return {'error': 'forbidden', 'source': client_ip()}
 
@@ -104,6 +104,20 @@ def node_put_status(node_name):
     return 'Updated', 201
 
 
+@app.route('/auth', methods=['POST', 'GET'])
+def auth_deal():
+    if 'password' not in cfg: 
+        return jsonify({'authenticated': True})
+    atoken = request.form.get('token')
+    apassword = request.form.get('password')
+    if apassword and crypt(apassword) == cfg['password']:
+        token = crypt('%.2f %s' % (time.time(), apassword))
+        tokens.add(token)
+        return jsonify({'token': token})
+    else:
+        return jsonify({'authenticated': atoken in tokens})
+
+
 @app.route('/reload')
 def reload():
     from pathlib import Path
@@ -111,19 +125,8 @@ def reload():
     return redirect('./')
         
 
-@app.route('/', methods=["GET", "POST"])
+@app.route('/', methods=['POST', 'GET'])
 def index(p='index.html'):
-    if not is_authenticated():
-        if 'password' in cfg:
-            if request.form.get('pass') == cfg['password']:
-                resp = Response('''<html><script>location.href='./'</script>
-                ''')
-                resp.set_cookie('auth', cfg['encrypted_password'], expires=datetime.now()+timedelta(days=90))
-                return resp
-            elif request.cookies.get('auth', '') != cfg['encrypted_password']:
-                return Response('''<html><form method="post" action=""><input type="password" name="pass"></form>
-                ''' + client_ip())
-    
     if p and os.path.exists(p) and p != 'config.yaml':
         with open(p, 'rb') as f:
             return Response(f.read(), mimetype={
@@ -134,7 +137,13 @@ def index(p='index.html'):
     return 'Not Found for {}'.format(p), 404
 
 
-if __name__ == '__main__':    
+if __name__ == '__main__':
+    
+    import sys
+    if len(sys.argv) == 3 and sys.argv[1] == 'crypt':
+        pwd = sys.argv[2]
+        print(crypt(pwd))
+        exit()
     
     if cfg.get('http_serv', True):
         if cfg.get('websocket'):

@@ -15,6 +15,12 @@
 
 <body>
     <div id="app">
+        <div id="login">
+            <form action="" onsubmit="return false;">
+                <input type="password" placeholder="Password" id="password">
+                <button class="btn-primary" @click="login()">Authenticate</button>
+            </form>
+        </div>
         <div id="sidedrawer" class="mui--no-user-select">
             <div id="sidedrawer-brand" class="mui--appbar-line-height">
                 <span class="mui--text-title">Status Monitor</span>
@@ -83,8 +89,7 @@
                                                     </span>
                                                 </p>
                                                 <div>
-                                                    <button class="mui-btn mui-btn--primary" @click="action_button(current[1], 'reboot')">重启</button>
-                                                    <button class="mui-btn mui-btn--danger" @click="action_button(current[1], 'force_off')">强制关机</button>
+                                                    <button class="mui-btn mui-btn--danger" @click="action_button(current[1], 'reboot')">重启</button>
                                                     <button v-for="shortcut in resp[current[1]].shortcuts || ['df', 'top/-n1']" @click="action_button(current[1], 'run/' + shortcut)" class="mui-btn">{{ shortcut.split('/')[0] }}</button>
                                                     <br>
                                                     <textarea v-show="output" :value="output" rows="10" disabled></textarea>

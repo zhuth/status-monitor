@@ -1,7 +1,17 @@
 (function() {
 
-    const $ = jQuery,
-        $get = $.get;
+    const $ = jQuery;
+    
+    function $get(url) {
+        return $.post(url, {'token': localStorage['token'] || ''});
+    }
+
+    $get('auth').then(data => {
+        if (!data.authenticated) {
+            $('#login').show();
+            $('#sidedrawer, header, #content-wrapper').hide();
+        }
+    })
 
     Vue.component('button-toggler', {
         props: ['node', 'val', 'action', 'service'],
@@ -94,6 +104,17 @@
                     }
                 }
                 this.$forceUpdate();
+            },
+            login() {
+                var apass = $('#password').val();
+                $.post('auth', {'password': apass}).then(data => {
+                    if (data.token) {
+                        localStorage['token'] = data.token;
+                    } else {
+                        alert('Invalid password')
+                    }
+                    location.reload();
+                });
             }
         }
     });
