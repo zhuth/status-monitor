@@ -79,7 +79,10 @@ class SelfNode(nodes.StatusNode):
     def run(self, cmd, *args):
         assert cmd in cfg.get('allowed_commands', [])
         out_bytes = subprocess.check_output([cmd] + list(args), stderr=subprocess.STDOUT)
-        return out_bytes.decode('utf-8')
+        try:
+            return out_bytes.decode('utf-8')
+        except:
+            return out_bytes.decode('gbk')
 
     def _get_status(self):
     
@@ -129,7 +132,8 @@ class SelfNode(nodes.StatusNode):
         
             for _ in psutil.process_iter():
                 short_key = _.name() + ':'
-                long_key = short_key + _.username()
+                if os.name == 'nt': long_key = short_key
+                else: long_key = short_key + _.username()
                 s = None
                 if short_key in self.serv_procs:
                     s = self.serv_procs[short_key]
