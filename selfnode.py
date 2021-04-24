@@ -7,16 +7,6 @@ cfg = {}
 if os.path.exists('config.yaml'):
     cfg = yaml.safe_load(open('config.yaml', encoding='utf-8'))
 
-if cfg.get('websocket'):
-    if 'async_mode' not in cfg: cfg['async_mode'] = 'gevent'
-    a = __import__(cfg['async_mode'])
-    if cfg['async_mode'] == 'gevent':
-        from gevent import monkey
-        monkey.patch_all()
-    elif cfg['async_mode'] == 'eventlet': a.monkey_patch()
-
-DOCKER_EXEC = cfg.get('docker_exec', 'docker')
-
 import psutil, json, time, base64, sys, re
 import requests
 import subprocess
@@ -24,6 +14,7 @@ import nodes
 from threading import Thread
 
 nodes.StatusNode.timeout = cfg.get('timeout', 1)
+DOCKER_EXEC = cfg.get('docker_exec', 'docker')
         
 
 class SelfNode(nodes.StatusNode):
@@ -64,10 +55,7 @@ class SelfNode(nodes.StatusNode):
             else:
                 if 'type' in n: del n['type']
                 del n['name']
-                try:
-                    n = cls(**n)
-                except TypeError as te:
-                    raise te
+                n = cls(**n)
             self.nodes[name] = n
 
     def detect_power(self):
@@ -111,7 +99,7 @@ class SelfNode(nodes.StatusNode):
         status = {}
 
         status['shortcuts'] = cfg.get('shortcuts', [])
-
+        
         status['services'] = {}
         if self.services:
             for _ in self.services:
@@ -147,11 +135,11 @@ class SelfNode(nodes.StatusNode):
                     continue
 
                 status['services'][s['name']]['status'] = True
-                
+        
         if self.nodes:
             status['nodes'] = {}
-            for _, n in self.nodes.items():
-                status['nodes'][_] = type(n).__name__
+            for m, n in self.nodes.items():
+                status['nodes'][m] = {'type': type(n).__name__, 'dispname': n.dispname, 'name': m}
 
         t = time.time() - psutil.boot_time()
         status['uptime'] = '{}:{:02d}:{:02d}:{:02d} {:.01f}% {} Mem: {}'.format(
@@ -231,9 +219,6 @@ class SelfNode(nodes.StatusNode):
         return self._services
 
 
-selfnode = SelfNode()
-    
-    
 class ActiveNodeThread(Thread):   
     def __init__(self, parent):
         super().__init__(daemon=False)
@@ -254,7 +239,10 @@ class ActiveNodeThread(Thread):
                 continue
             time.sleep(cfg.get('interval', 30))
 
+selfnode = SelfNode()
+
 if cfg.get('parent'):
     parent = cfg['parent']
     if '://' not in parent: parent = 'http://' + parent
     ActiveNodeThread(parent).start()
+

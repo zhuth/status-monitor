@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import requests
-import subprocess
 import json
 import os
 import sys
@@ -29,7 +28,7 @@ class StatusNode:
     """
     timeout = 1
 
-    def __init__(self, ip=None, power_ip=None, services=None, interval=0, url=None, port=10000):
+    def __init__(self, ip=None, power_ip=None, services=None, interval=0, url=None, port=10000, dispname=''):
         self.url = url
         if url:
             self.base_url = url + 'node/self'
@@ -42,6 +41,7 @@ class StatusNode:
         self._services = services
         self._status_buf = {}
         self.last_update = 0
+        self.dispname = dispname
 
     def detect_power(self):
         if self.url:
@@ -146,152 +146,13 @@ class StatusNode:
         self.last_update = 0
 
 
-class AirPurifier(StatusNode):
-
-    def __init__(self, httpserv='', socket='/tmp/aqimonitor.socket', city='Beijing', interval=60):
-        super().__init__(interval=interval)
-        self._services = []
-        self.socket = socket
-        self.httpserv = httpserv
-        self.city = city
-
-    def detect_power(self):
-        return None
-
-    def icon_base64(self, aqio):
-        if not isinstance(aqio, str):
-            aqio = str(int(aqio))
-        aqi_icon = self.icon(aqio) or b''
-        return 'data:image/png;base64,' + base64.b64encode(aqi_icon).decode('ascii')
-
-    def try_connect(self):
-        import socket
-        try:
-            skt = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            skt.connect(self.socket)
-            return skt
-        except:
-            pass
-
-    def call_command(self, cmd='?'):
-        r = b''
-        skt = self.try_connect()
-        if self.httpserv and len(cmd) == 1:
-            path = self.httpserv
-            if cmd != '?': path += cmd
-            try:
-                lines = requests.get(path).content.decode('ascii').split('\r\n')
-                if cmd == '?':
-                    r = {}
-                    paqi, pm, th = lines[:3]
-                    r['aqi'] = paqi
-                    r['pm25'], r['pm10'] = pm.split(' ')
-                    r['temp'], r['hum'] = th.split(' ')
-            except:
-                return
-        else:
-            try:
-                if not skt: return
-                skt.sendall(cmd.encode('utf-8'))
-                if cmd == '?':
-                    tr = skt.recv(1024)
-                    r = json.loads(
-                        tr[tr.find(b'{'):tr.rfind(b'}')+1].decode('utf-8'))
-                    if r['aqi'] > 1000:
-                        raise Exception("Data range error.")
-                else:
-                    while True:
-                        tr = skt.recv(1024)
-                        if not tr:
-                            break
-                        r += tr
-                skt.close()
-            except TypeError as e:
-                r['aqi'] = '-'
-                r['error'] = str(e)
-
-        if cmd == '?':
-            return r
-        elif cmd.startswith('icon'):
-            return r
-        else:
-            return r.decode('utf-8')
-
-    def icon(self, aqistr):
-        return self.call_command('icon{}.'.format(aqistr))
-        
-    def aqi_icon(self, aqi):
-        return Response(self.icon(aqi), content_type='image/png')
-
-    def aqi_pred(self):
-        return {
-            'first_half': float(self.call_command('pred0,12') or -1),
-            'second_half': float(self.call_command('pred12,12') or -1)
-        }
-
-    def city_aqi(self):
-        js = requests.get(
-            'http://feed.aqicn.org/feed/{}/en/feed.v1.js'.format(self.city)).content.decode('utf-8')
-        m = re.search(r'>(\d+)<', js)
-        if m:
-            return m.group(1)
-        else:
-            return '-'
-
-    def _get_status(self):
-        d = self.call_command('?') or {'aqi': '-'}
-        if d['aqi'] != '-':
-            d['aqi_icon'] = self.icon_base64(d['aqi'])
-            d['temp'] = str(int(d['temp'])) + 'd'
-            d['hum'] = str(int(d['hum'])) + '%'
-            
-        pred = self.aqi_pred()
-        d['aqi_pred'] = self.icon_base64('{}:{}'.format(
-            int(pred['first_half']*30), int(pred['second_half']*30)))
-        d['city_aqi'] = self.icon_base64(self.city_aqi())
-        d['power'] = None
-        return d
-
-    def show(self, text):
-        return self.call_command('c' + text)
-
-    def reset(self):
-        return self.call_command('y')
-
-    def time(self):
-        import datetime
-        now = datetime.datetime.now()
-        return self.call_command('t{}{:02d}{:02d}'.format(now.year, now.month, now.day))
-
-    def toggle(self):
-        return self.call_command('-')
-
-    def speed1(self):
-        return self.call_command('1')
-
-    def speed2(self):
-        return self.call_command('2')
-
-    def power_on(self):
-        return self.call_command('x')
-
-    def power_off(self):
-        return self.call_command('0')
-
-    def bgon(self):
-        return self.call_command(':')
-
-    def bgoff(self):
-        return self.call_command('/')
-
-
 class SwitchNode(StatusNode):
     """
     Power Node
     """
 
-    def __init__(self, power_ip):
-        super().__init__(self, power_ip=power_ip, services=[])
+    def __init__(self, power_ip, **kwargs):
+        super().__init__(self, power_ip=power_ip, services=[], **kwargs)
 
     def detect_power(self):
         try:
@@ -314,35 +175,10 @@ class SwitchNode(StatusNode):
         return True
 
 
-class KonkeNode(SwitchNode):
-    """
-    Konke Switch
-    """
-
-    @property
-    def _konke(self):
-        from pykonkeio import Switch
-        return Switch(self.power_ip)
-
-    def __init__(self, power_ip):
-        super().__init__(power_ip)
-        
-    def detect_power(self):
-        st = self._konke.status
-        if st != 'offline': return st == 'open'
-
-    def power_off(self):
-        return self._konke.turn_off()
-    
-    def power_on(self):
-        print('power on')
-        return self._konke.turn_on()
-
-
 class DelegateNode(StatusNode):
 
-    def __init__(self, name, parent, services=None, interval=0):
-        super().__init__(services=services, interval=interval)
+    def __init__(self, name, parent, services=None, interval=0, **kwargs):
+        super().__init__(services=services, interval=interval, **kwargs)
         self.parent = parent
         self.name = name
 
@@ -386,10 +222,10 @@ class DelegateNode(StatusNode):
 
 class TpLinkRouterNode(StatusNode):
 
-    def __init__(self, ip, password, interval=0):
-        super().__init__(ip=ip, interval=interval)
-        from tplink_api.tplink import TpLinkRouter
-        self.router = TpLinkRouter(ip)
+    def __init__(self, ip, password, interval=0, **kwargs):
+        super().__init__(ip=ip, interval=interval, **kwargs)
+        self._tpLinkRouterClass = __import__('tplink_api.tplink').TpLinkRouter
+        self.router = self._tpLinkRouterClass(ip)
         self.password = password
         self._services = [
             {'name': 'wlan2g', 'dispname': '2.4GHz'},

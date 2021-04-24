@@ -30,8 +30,8 @@
                 <li>
                     <strong>节点</strong>
                     <ul>
-                        <li class="pointer" v-for="node in nodes" @click="navigate('node/' + node)" :class="{active: current[0] == 'node' &&
-                current[1] == node}">{{ config.node_names[node] || node }}</li>
+                        <li class="pointer" v-for="node in nodes" @click="navigate('node/' + node.name)" :class="{active: current[0] == 'node' &&
+                current[1] == node.name}">{{ node.dispname || node.name.toUpperCase() }}</li>
                     </ul>
                 </li>
                 <li :class="{active:
@@ -68,10 +68,10 @@
                         <div class="mui-panel" id="u_main">
                             <section v-if="current[0] === 'node'">
                                 <div v-if="resp[current[1]]">
-                                    <h1 id="n_name">{{ config.node_names[current[1]] || ((config.node_names[current[0]] || '') + (current[1] || '')) }}
+                                    <h1 id="n_name">{{ resp[current[1]].dispname || current[1].toUpperCase() }}
                                         <button-toggler :node="current[1]" action="power" :val="resp[current[1]]['power']"></button-toggler>
                                     </h1>
-                                    <div v-if="current[1] !== 'air'">
+                                    <div>
                                         <div v-show="resp[current[1]].power">
                                             <ul class="mui-tabs__bar">
                                                 <li class="mui--is-active"><a data-mui-toggle="tab" data-mui-controls="pane-node-status">状态</a></li>
@@ -110,44 +110,20 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div v-else>
-                                        <h2>状态</h2>
-                                        <p v-if="resp.air">
-                                            <img :src="resp.air.aqi_icon" alt="" id="n_aqi_icon" class="aqi-icons">
-                                            <img :src="resp.air.city_aqi" alt="" id="n_city_aqi" class="aqi-icons">
-                                            <img :src="resp.air.aqi_pred" alt="" id="n_aqi_pred" class="aqi-icons">
-                                        </p>
-                                        <p>
-                                            <temperature-viewer :val="resp[current[1]].temp"></temperature-viewer>
-                                            /
-                                            <span id="n_hum">{{ resp.air.hum }}</span>
-                                        </p>
-
-                                        <h2>操作</h2>
-                                        <div>
-                                            <button @click="action_button('air', 'power_on')" class="mui-btn button-on">开</button>
-                                            <button @click="action_button('air', 'speed1')" class="mui-btn mui-btn--primary">速度1</button>
-                                            <button @click="action_button('air', 'speed2')" class="mui-btn mui-btn--primary">速度2</button>
-                                        </div>
-                                        <div>
-                                            <button @click="action_button('air', 'power_off')" class="mui-btn button-off">关</button>
-                                            <button @click="action_button('air', 'reset')" class="mui-btn mui-btn--accent">重置</button>
-                                        </div>
-                                    </div>
                                 </div>
                             </section>
 
                             <section v-else-if="current[0] === 'switches'">
                                 <div v-for="n in switch_nodes">
-                                    <button-toggler v-if="resp[n]" :node="n" action="power" :val="resp[n]['power']"></button-toggler>
+                                    <button-toggler v-if="resp[n.name]" :node="n.name" action="power" :val="resp[n.name]['power']"></button-toggler>
                                     <h3>
-                                        {{ config.node_names[n] || n }}
+                                        {{ n.dispname || n.name.toUpperCase() }}
                                     </h3>
                                 </div>
                             </section>
 
                             <section v-else-if="current[0] === 'cameras'">
-                                <img v-for="channel in config.video_channels" :src="config.video_provider.replace('{channel}', channel).replace('{t}', _t)" :data-channel="channel" alt="video">
+                                <img v-for="channel in video_channels" :src="video_provider.replace('{channel}', channel).replace('{t}', _t)" :data-channel="channel" alt="video">
                             </section>
 
                             <div class="space-bottom"></div>
@@ -164,7 +140,7 @@
         </div>
     </footer>
 
-    <script src="static/config.js"></script>
+    <script src="config.js"></script>
     <script src="static/controls.js"></script>
 </body>
 

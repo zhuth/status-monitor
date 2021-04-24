@@ -56,7 +56,7 @@
         el: '#app',
         data: {
             config: config,
-            nodes: ['self'],
+            nodes: [{name: 'self', type: 'StatusNode', dispname: config.dispname}],
             switch_nodes: [],
             resp: {},
             current: [''],
@@ -94,12 +94,15 @@
                 } else {
                     var nodes = this.nodes;
                     if (this.current[0] === 'switches') nodes = this.switch_nodes;
-                    else if (this.current[0] === 'node') nodes = [this.current[1]];
+                    else if (this.current[0] === 'node') nodes = this.nodes.filter(n => n.name === this.current[1]);
 
                     for (let n of nodes) {
-                        $get('node/' + n).then((data) => {
-                            if (data.resp) this.resp[n] = data.resp;
-                            this.$forceUpdate();
+                        $get('node/' + n.name).then((data) => {
+                            if (data.resp) {
+                                data.resp.dispname = n.dispname;
+                                this.resp[n.name] = data.resp;
+                                this.$forceUpdate();
+                            }
                         });
                     }
                 }
@@ -120,15 +123,15 @@
     });
 
     $get('node/self').then((data) => {
-        for (let node in data.resp.nodes) {
-            if (['SwitchNode', 'KonkeNode'].indexOf(data.resp.nodes[node]) < 0) app.nodes.push(node);
+        for (var n in data.resp.nodes) {
+            var node = data.resp.nodes[n];
+            if (['SwitchNode', 'KonkeNode'].indexOf(node.type) < 0) app.nodes.push(node);
             else app.switch_nodes.push(node);
         }
     });
 
     $(window).on('hashchange', function(e) {
-        const
-            hash = location.hash.substr(1).split('/');
+        const hash = location.hash.substr(1).split('/');
 
         app.current = hash;
         app.output = '';

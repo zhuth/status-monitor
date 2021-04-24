@@ -8,6 +8,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # normal imports
 
 import traceback
+import json
 from datetime import datetime, timedelta
 import time
 from flask import Flask, Response, jsonify, request, redirect
@@ -124,7 +125,14 @@ def reload():
     from pathlib import Path
     Path(__file__).touch()
     return redirect('./')
-        
+
+
+@app.route('/config.js')
+def config():
+    return 'var config = ' + json.dumps({
+        'default_hash': 'node/self',
+        'dispname': cfg.get('dispname', 'Router')
+    })
 
 @app.route('/', methods=['POST', 'GET'])
 def index(p='index.html'):
@@ -147,10 +155,4 @@ if __name__ == '__main__':
         exit()
     
     if cfg.get('http_serv', True):
-        if cfg.get('websocket'):
-            import ws
-            vars = globals()
-            ws.apply(vars)
-        else:
-            print('Web Socket disabled')
-            app.run(host='0.0.0.0', port=cfg.get('port', 10000), debug=True)
+        app.run(host='0.0.0.0', port=cfg.get('port', 10000), debug=True)
