@@ -6,13 +6,6 @@
         return $.post(url, {'token': localStorage['token'] || ''});
     }
 
-    $get('auth').then(data => {
-        if (!data.authenticated) {
-            $('#login').show();
-            $('#sidedrawer, header, #content-wrapper').hide();
-        }
-    })
-
     Vue.component('button-toggler', {
         props: ['node', 'val', 'action', 'service'],
         data: function() {
@@ -61,6 +54,7 @@
             resp: {},
             current: [''],
             output: '',
+			logined: false,
             _t: 0
         },
         methods: {
@@ -121,6 +115,10 @@
             }
         }
     });
+	
+    $get('auth').then(data => {
+        app.logined = data.authenticated
+    })
 
     $get('node/self').then((data) => {
         for (var n in data.resp.nodes) {
@@ -132,7 +130,6 @@
 
     $(window).on('hashchange', function(e) {
         const hash = location.hash.substr(1).split('/');
-
         app.current = hash;
         app.output = '';
         app.update();

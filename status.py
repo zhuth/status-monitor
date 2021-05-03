@@ -32,16 +32,15 @@ def client_ip():
 def is_authenticated():
     import fnmatch
 
-    if 'granted_ips' in cfg:
-        client = client_ip()
-        for ips in cfg['granted_ips']:
-            if client == ips or (('*' in ips or '?' in ips) and fnmatch.fnmatch(client, ips)):
-                return True
+    client = client_ip()
+    for ips in cfg.get('granted_ips', ['*']):
+        if client == ips or (('*' in ips or '?' in ips) and fnmatch.fnmatch(client, ips)):
+            return True
     
     if 'password' in cfg:
         return request.form.get('token') in tokens
     
-    return True
+    return False
 
 
 def node_call(node_name='self', cmd='get_status', arg=''):
@@ -112,7 +111,7 @@ def auth_deal():
 
     atoken = request.form.get('token')
     apassword = request.form.get('password')
-    if apassword and crypt(apassword) == cfg['password']:
+    if apassword and crypt(apassword) == cfg.get('password', ''):
         token = crypt('%.2f %s' % (time.time(), apassword))
         tokens.add(token)
         return jsonify({'token': token})

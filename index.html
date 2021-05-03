@@ -15,18 +15,12 @@
 
 <body>
     <div id="app">
-        <div id="login">
-            <form action="" onsubmit="return false;">
-                <input type="password" placeholder="Password" id="password">
-                <button class="btn-primary" @click="login()">Authenticate</button>
-            </form>
-        </div>
         <div id="sidedrawer" class="mui--no-user-select">
             <div id="sidedrawer-brand" class="mui--appbar-line-height">
                 <span class="mui--text-title">Status Monitor</span>
             </div>
             <div class="mui-divider"></div>
-            <ul>
+            <ul v-show="logined">
                 <li>
                     <strong>节点</strong>
                     <ul>
@@ -65,7 +59,18 @@
                     <div class="mui-col-sm-10 mui-col-sm-offset-1">
                         <div class="space-top"></div>
                         <p>&nbsp;</p>
-                        <div class="mui-panel" id="u_main">
+
+				        <div id="login" class="mui-panel" v-show="!logined">
+				            <form action="" onsubmit="return false;">
+								<div class="mui-textfield">
+				                <input type="password" placeholder="Password" id="password">
+								<label>Password</label>
+							</div>
+				                <button class="mui-btn mui-btn--primary" @click="login()">Authenticate</button>
+				            </form>
+				        </div>
+						
+                        <div class="mui-panel" id="u_main" v-show="logined">
                             <section v-if="current[0] === 'node'">
                                 <div v-if="resp[current[1]]">
                                     <h1 id="n_name">{{ resp[current[1]].dispname || current[1].toUpperCase() }}
