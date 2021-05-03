@@ -224,7 +224,7 @@ class TpLinkRouterNode(StatusNode):
 
     def __init__(self, ip, password, interval=0, **kwargs):
         super().__init__(ip=ip, interval=interval, **kwargs)
-        self._tpLinkRouterClass = __import__('tplink_api.tplink').TpLinkRouter
+        self._tpLinkRouterClass = __import__('tplink_api.tplink').tplink.TpLinkRouter
         self.router = self._tpLinkRouterClass(ip)
         self.password = password
         self._services = [
